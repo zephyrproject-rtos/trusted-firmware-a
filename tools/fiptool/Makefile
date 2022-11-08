@@ -9,8 +9,9 @@ include ${MAKE_HELPERS_DIRECTORY}build_macros.mk
 include ${MAKE_HELPERS_DIRECTORY}build_env.mk
 
 FIPTOOL ?= fiptool${BIN_EXT}
-PROJECT := $(notdir ${FIPTOOL})
-OBJECTS := fiptool.o tbbr_config.o
+PROJECT := ${FIPTOOL}
+PROJECT_DIR := $(dir ${FIPTOOL})
+OBJECTS := ${PROJECT_DIR}/fiptool.o ${PROJECT_DIR}/tbbr_config.o
 V ?= 0
 OPENSSL_DIR := /usr
 
@@ -62,7 +63,7 @@ ${PROJECT}: ${OBJECTS} Makefile
 	@echo "Built $@ successfully"
 	@${ECHO_BLANK_LINE}
 
-%.o: %.c Makefile
+${PROJECT_DIR}/%.o: %.c Makefile
 	@echo "  HOSTCC  $<"
 	${Q}${HOSTCC} -c ${CPPFLAGS} ${HOSTCCFLAGS} ${INCLUDE_PATHS} $< -o $@
 
