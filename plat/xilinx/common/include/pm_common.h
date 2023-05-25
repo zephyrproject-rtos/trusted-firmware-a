@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2018, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2013-2018, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -26,6 +26,11 @@
 #define PAYLOAD_ARG_CNT         6U
 #endif
 #define PAYLOAD_ARG_SIZE	4U	/* size in bytes */
+
+#define TZ_VERSION_MAJOR	1
+#define TZ_VERSION_MINOR	0
+#define TZ_VERSION		((TZ_VERSION_MAJOR << 16) | \
+				 TZ_VERSION_MINOR)
 
 /**
  * pm_ipi - struct for capturing IPI-channel specific info

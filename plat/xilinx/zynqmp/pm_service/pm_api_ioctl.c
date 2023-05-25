@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2018-2022, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2018-2022, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -16,10 +17,10 @@
 
 #include "pm_api_clock.h"
 #include "pm_api_ioctl.h"
-#include "pm_api_sys.h"
 #include "pm_client.h"
 #include "pm_common.h"
 #include "pm_ipi.h"
+#include "zynqmp_pm_api_sys.h"
 
 /**
  * pm_ioctl_get_rpu_oper_mode () - Get current RPU operation mode
@@ -553,7 +554,7 @@ static enum pm_ret_status pm_ioctl_afi(uint32_t index,
 		return PM_RET_ERROR_ARGS;
 	}
 
-	if (index < AFIFM6_WRCTRL) {
+	if (index <= AFIFM6_WRCTRL) {
 		mask = FABRIC_WIDTH;
 	} else {
 		mask = 0xf00;
@@ -759,7 +760,7 @@ enum pm_ret_status atf_ioctl_bitmask(uint32_t *bit_mask)
 		}
 		ret = check_api_dependency(ioctl_id);
 		if (ret == PM_RET_SUCCESS) {
-			bit_mask[ioctl_id / 32] |= BIT(ioctl_id % 32);
+			bit_mask[ioctl_id / 32U] |= BIT(ioctl_id % 32U);
 		}
 	}
 

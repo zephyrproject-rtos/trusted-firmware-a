@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2018-2020, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2018-2020, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -16,56 +17,56 @@
 #include <plat/common/platform.h>
 
 #include "pm_api_clock.h"
-#include "pm_api_sys.h"
 #include "pm_client.h"
 #include "pm_common.h"
 #include "pm_ipi.h"
+#include "zynqmp_pm_api_sys.h"
 
-#define CLK_NODE_MAX			U(6)
+#define CLK_NODE_MAX			(6U)
 
-#define CLK_PARENTS_ID_LEN		U(16)
-#define CLK_TOPOLOGY_NODE_OFFSET	U(16)
-#define CLK_TOPOLOGY_PAYLOAD_LEN	U(12)
-#define CLK_PARENTS_PAYLOAD_LEN		U(12)
-#define CLK_TYPE_SHIFT			U(2)
-#define CLK_CLKFLAGS_SHIFT		U(8)
-#define CLK_TYPEFLAGS_SHIFT		U(24)
-#define CLK_TYPEFLAGS2_SHIFT		U(4)
-#define CLK_TYPEFLAGS_BITS_MASK		U(0xFF)
-#define CLK_TYPEFLAGS2_BITS_MASK	U(0x0F00)
-#define CLK_TYPEFLAGS_BITS		U(8)
+#define CLK_PARENTS_ID_LEN		(16U)
+#define CLK_TOPOLOGY_NODE_OFFSET	(16U)
+#define CLK_TOPOLOGY_PAYLOAD_LEN	(12U)
+#define CLK_PARENTS_PAYLOAD_LEN		(12U)
+#define CLK_TYPE_SHIFT			(2U)
+#define CLK_CLKFLAGS_SHIFT		(8U)
+#define CLK_TYPEFLAGS_SHIFT		(24U)
+#define CLK_TYPEFLAGS2_SHIFT		(4U)
+#define CLK_TYPEFLAGS_BITS_MASK		(0xFFU)
+#define CLK_TYPEFLAGS2_BITS_MASK	(0x0F00U)
+#define CLK_TYPEFLAGS_BITS		(8U)
 
 #define CLK_EXTERNAL_PARENT	(PARENT_CLK_EXTERNAL << CLK_PARENTS_ID_LEN)
 
-#define NA_MULT					U(0)
-#define NA_DIV					U(0)
-#define NA_SHIFT				U(0)
-#define NA_WIDTH				U(0)
-#define NA_CLK_FLAGS				U(0)
-#define NA_TYPE_FLAGS				U(0)
+#define NA_MULT					(0U)
+#define NA_DIV					(0U)
+#define NA_SHIFT				(0U)
+#define NA_WIDTH				(0U)
+#define NA_CLK_FLAGS				(0U)
+#define NA_TYPE_FLAGS				(0U)
 
 /* PLL nodes related definitions */
-#define PLL_PRESRC_MUX_SHIFT			U(20)
-#define PLL_PRESRC_MUX_WIDTH			U(3)
-#define PLL_POSTSRC_MUX_SHIFT			U(24)
-#define PLL_POSTSRC_MUX_WIDTH			U(3)
-#define PLL_DIV2_MUX_SHIFT			U(16)
-#define PLL_DIV2_MUX_WIDTH			U(1)
-#define PLL_BYPASS_MUX_SHIFT			U(3)
-#define PLL_BYPASS_MUX_WIDTH			U(1)
+#define PLL_PRESRC_MUX_SHIFT			(20U)
+#define PLL_PRESRC_MUX_WIDTH			(3U)
+#define PLL_POSTSRC_MUX_SHIFT			(24U)
+#define PLL_POSTSRC_MUX_WIDTH			(3U)
+#define PLL_DIV2_MUX_SHIFT			(16U)
+#define PLL_DIV2_MUX_WIDTH			(1U)
+#define PLL_BYPASS_MUX_SHIFT			(3U)
+#define PLL_BYPASS_MUX_WIDTH			(1U)
 
 /* Peripheral nodes related definitions */
 /* Peripheral Clocks */
-#define PERIPH_MUX_SHIFT			U(0)
-#define PERIPH_MUX_WIDTH			U(3)
-#define PERIPH_DIV1_SHIFT			U(8)
-#define PERIPH_DIV1_WIDTH			U(6)
-#define PERIPH_DIV2_SHIFT			U(16)
-#define PERIPH_DIV2_WIDTH			U(6)
-#define PERIPH_GATE_SHIFT			U(24)
-#define PERIPH_GATE_WIDTH			U(1)
+#define PERIPH_MUX_SHIFT			(0U)
+#define PERIPH_MUX_WIDTH			(3U)
+#define PERIPH_DIV1_SHIFT			(8U)
+#define PERIPH_DIV1_WIDTH			(6U)
+#define PERIPH_DIV2_SHIFT			(16U)
+#define PERIPH_DIV2_WIDTH			(6U)
+#define PERIPH_GATE_SHIFT			(24U)
+#define PERIPH_GATE_WIDTH			(1U)
 
-#define USB_GATE_SHIFT				U(25)
+#define USB_GATE_SHIFT				(25U)
 
 /* External clock related definitions */
 
@@ -87,20 +88,20 @@
 
 
 #define PLLCTRL_BP_MASK				BIT(3)
-#define PLLCTRL_RESET_MASK			U(1)
-#define PLL_FRAC_OFFSET				U(8)
-#define PLL_FRAC_MODE				U(1)
-#define PLL_INT_MODE				U(0)
-#define PLL_FRAC_MODE_MASK			U(0x80000000)
-#define PLL_FRAC_MODE_SHIFT			U(31)
-#define PLL_FRAC_DATA_MASK			U(0xFFFF)
-#define PLL_FRAC_DATA_SHIFT			U(0)
-#define PLL_FBDIV_MASK				U(0x7F00)
-#define PLL_FBDIV_WIDTH				U(7)
-#define PLL_FBDIV_SHIFT				U(8)
+#define PLLCTRL_RESET_MASK			(1U)
+#define PLL_FRAC_OFFSET				(8U)
+#define PLL_FRAC_MODE				(1U)
+#define PLL_INT_MODE				(0U)
+#define PLL_FRAC_MODE_MASK			(0x80000000U)
+#define PLL_FRAC_MODE_SHIFT			(31U)
+#define PLL_FRAC_DATA_MASK			(0xFFFFU)
+#define PLL_FRAC_DATA_SHIFT			(0U)
+#define PLL_FBDIV_MASK				(0x7F00U)
+#define PLL_FBDIV_WIDTH				(7U)
+#define PLL_FBDIV_SHIFT				(8U)
 
-#define CLK_PLL_RESET_ASSERT			U(1)
-#define CLK_PLL_RESET_RELEASE			U(2)
+#define CLK_PLL_RESET_ASSERT			(1U)
+#define CLK_PLL_RESET_RELEASE			(2U)
 #define CLK_PLL_RESET_PULSE	(CLK_PLL_RESET_ASSERT | CLK_PLL_RESET_RELEASE)
 
 /* Common topology definitions */
@@ -2400,7 +2401,7 @@ static bool pm_clock_valid(uint32_t clock_id)
 {
 	unsigned int i;
 
-	for (i = 0; i < ARRAY_SIZE(pm_clk_invalid_list); i++)
+	for (i = 0U; i < ARRAY_SIZE(pm_clk_invalid_list); i++)
 		if (pm_clk_invalid_list[i] == clock_id)
 			return 0;
 
@@ -2672,9 +2673,9 @@ enum pm_ret_status pm_api_clock_get_max_divisor(enum clock_id clock_id,
 		if (nodes[i].type == div_type) {
 			if (CLK_DIVIDER_POWER_OF_TWO &
 					nodes[i].typeflags) {
-				*max_div = (1 << (BIT(nodes[i].width) - 1));
+				*max_div = (1U << (BIT(nodes[i].width) - 1U));
 			} else {
-				*max_div = BIT(nodes[i].width) - 1;
+				*max_div = BIT(nodes[i].width) - 1U;
 			}
 			return PM_RET_SUCCESS;
 		}
@@ -2815,7 +2816,7 @@ struct pm_pll *pm_clock_get_pll_by_related_clk(enum clock_id clock_id)
  */
 enum pm_ret_status pm_clock_pll_enable(struct pm_pll *pll)
 {
-	if (!pll) {
+	if (pll == NULL) {
 		return PM_RET_ERROR_ARGS;
 	}
 
@@ -2838,7 +2839,7 @@ enum pm_ret_status pm_clock_pll_enable(struct pm_pll *pll)
  */
 enum pm_ret_status pm_clock_pll_disable(struct pm_pll *pll)
 {
-	if (!pll) {
+	if (pll == NULL) {
 		return PM_RET_ERROR_ARGS;
 	}
 
@@ -2862,7 +2863,7 @@ enum pm_ret_status pm_clock_pll_get_state(struct pm_pll *pll,
 	enum pm_ret_status status;
 	enum pm_pll_mode mode;
 
-	if (!pll || !state) {
+	if ((pll == NULL) || !state) {
 		return PM_RET_ERROR_ARGS;
 	}
 
@@ -2896,7 +2897,7 @@ enum pm_ret_status pm_clock_pll_set_parent(struct pm_pll *pll,
 					   enum clock_id clock_id,
 					   uint32_t parent_index)
 {
-	if (!pll) {
+	if (pll == NULL) {
 		return PM_RET_ERROR_ARGS;
 	}
 	if (pll->pre_src == clock_id) {
@@ -2929,7 +2930,7 @@ enum pm_ret_status pm_clock_pll_get_parent(struct pm_pll *pll,
 					   enum clock_id clock_id,
 					   uint32_t *parent_index)
 {
-	if (!pll) {
+	if (pll == NULL) {
 		return PM_RET_ERROR_ARGS;
 	}
 	if (pll->pre_src == clock_id) {
@@ -2966,7 +2967,7 @@ enum pm_ret_status pm_clock_set_pll_mode(enum clock_id clock_id,
 {
 	struct pm_pll *pll = pm_clock_get_pll(clock_id);
 
-	if (!pll || (mode != PLL_FRAC_MODE && mode != PLL_INT_MODE)) {
+	if ((pll == NULL) || (mode != PLL_FRAC_MODE && mode != PLL_INT_MODE)) {
 		return PM_RET_ERROR_ARGS;
 	}
 	pll->mode = mode;
@@ -2988,7 +2989,7 @@ enum pm_ret_status pm_clock_get_pll_mode(enum clock_id clock_id,
 {
 	struct pm_pll *pll = pm_clock_get_pll(clock_id);
 
-	if (!pll || !mode) {
+	if ((pll == NULL) || !mode) {
 		return PM_RET_ERROR_ARGS;
 	}
 	*mode = pll->mode;

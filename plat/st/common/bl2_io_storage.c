@@ -14,6 +14,7 @@
 #include <drivers/fwu/fwu_metadata.h>
 #include <drivers/io/io_block.h>
 #include <drivers/io/io_driver.h>
+#include <drivers/io/io_encrypted.h>
 #include <drivers/io/io_fip.h>
 #include <drivers/io/io_memmap.h>
 #include <drivers/io/io_mtd.h>
@@ -24,7 +25,6 @@
 #include <drivers/raw_nand.h>
 #include <drivers/spi_nand.h>
 #include <drivers/spi_nor.h>
-#include <drivers/st/io_mmc.h>
 #include <drivers/st/stm32_fmc2_nand.h>
 #include <drivers/st/stm32_qspi.h>
 #include <drivers/st/stm32_sdmmc2.h>
@@ -37,6 +37,7 @@
 
 #include <platform_def.h>
 #include <stm32cubeprogrammer.h>
+#include <stm32mp_efi.h>
 #include <stm32mp_fconf_getter.h>
 #include <stm32mp_io_storage.h>
 #include <usb_dfu.h>
@@ -46,6 +47,11 @@ uintptr_t fip_dev_handle;
 uintptr_t storage_dev_handle;
 
 static const io_dev_connector_t *fip_dev_con;
+
+#ifndef DECRYPTION_SUPPORT_none
+static const io_dev_connector_t *enc_dev_con;
+uintptr_t enc_dev_handle;
+#endif
 
 #if STM32MP_SDMMC || STM32MP_EMMC
 static struct mmc_device_info mmc_info;
@@ -116,6 +122,29 @@ int open_fip(const uintptr_t spec)
 {
 	return io_dev_init(fip_dev_handle, (uintptr_t)FIP_IMAGE_ID);
 }
+
+#ifndef DECRYPTION_SUPPORT_none
+int open_enc_fip(const uintptr_t spec)
+{
+	int result;
+	uintptr_t local_image_handle;
+
+	result = io_dev_init(enc_dev_handle, (uintptr_t)ENC_IMAGE_ID);
+	if (result != 0) {
+		return result;
+	}
+
+	result = io_open(enc_dev_handle, spec, &local_image_handle);
+	if (result != 0) {
+		return result;
+	}
+
+	VERBOSE("Using encrypted FIP\n");
+	io_close(local_image_handle);
+
+	return 0;
+}
+#endif
 
 int open_storage(const uintptr_t spec)
 {
@@ -220,6 +249,10 @@ static void boot_mmc(enum mmc_device_type mmc_dev_type,
 		break;
 	}
 
+	if (mmc_dev_type != MMC_IS_EMMC) {
+		params.flags = MMC_FLAG_SD_CMD6;
+	}
+
 	params.device_info = &mmc_info;
 	if (stm32_sdmmc2_mmc_init(&params) != 0) {
 		ERROR("SDMMC%u init failed\n", boot_interface_instance);
@@ -252,6 +285,7 @@ static void boot_mmc(enum mmc_device_type mmc_dev_type,
 		VERBOSE("%s: FIP header found on eMMC boot partition\n",
 			__func__);
 		image_block_spec.offset = STM32MP_EMMC_BOOT_FIP_OFFSET;
+		image_block_spec.length = mmc_boot_part_size() - STM32MP_EMMC_BOOT_FIP_OFFSET;
 	}
 #endif
 }
@@ -377,6 +411,15 @@ void stm32mp_io_setup(void)
 	io_result = io_dev_open(fip_dev_con, (uintptr_t)NULL,
 				&fip_dev_handle);
 
+#ifndef DECRYPTION_SUPPORT_none
+	io_result = register_io_dev_enc(&enc_dev_con);
+	assert(io_result == 0);
+
+	io_result = io_dev_open(enc_dev_con, (uintptr_t)NULL,
+				&enc_dev_handle);
+	assert(io_result == 0);
+#endif
+
 	switch (boot_context->boot_interface_selected) {
 #if STM32MP_SDMMC
 	case BOOT_API_CTX_BOOT_INTERFACE_SEL_FLASH_SD:
@@ -451,13 +494,20 @@ int bl2_plat_handle_pre_image_load(unsigned int image_id)
  */
 #if !PSA_FWU_SUPPORT
 			const partition_entry_t *entry;
+			const struct efi_guid img_type_guid = STM32MP_FIP_GUID;
+			uuid_t img_type_uuid;
 
+			guidcpy(&img_type_uuid, &img_type_guid);
 			partition_init(GPT_IMAGE_ID);
-			entry = get_partition_entry(FIP_IMAGE_NAME);
+			entry = get_partition_entry_by_type(&img_type_uuid);
 			if (entry == NULL) {
-				ERROR("Could NOT find the %s partition!\n",
-				      FIP_IMAGE_NAME);
-				return -ENOENT;
+				entry = get_partition_entry(FIP_IMAGE_NAME);
+				if (entry == NULL) {
+					ERROR("Could NOT find the %s partition!\n",
+					      FIP_IMAGE_NAME);
+
+					return -ENOENT;
+				}
 			}
 
 			image_block_spec.offset = entry->start;
@@ -556,7 +606,7 @@ int plat_get_image_source(unsigned int image_id, uintptr_t *dev_handle,
  *     - we already boot FWU_MAX_TRIAL_REBOOT times in trial mode.
  * we select the previous_active_index.
  */
-#define INVALID_BOOT_IDX		0xFFFFFFFF
+#define INVALID_BOOT_IDX		0xFFFFFFFFU
 
 uint32_t plat_fwu_get_boot_idx(void)
 {

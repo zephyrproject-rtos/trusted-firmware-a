@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2020, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2014-2020, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -52,21 +52,6 @@
 #define FSBL_FLAGS_A53_1		1U
 #define FSBL_FLAGS_A53_2		2U
 #define FSBL_FLAGS_A53_3		3U
-
-#define FSBL_MAX_PARTITIONS		8U
-
-/* Structure corresponding to each partition entry */
-struct xfsbl_partition {
-	uint64_t entry_point;
-	uint64_t flags;
-};
-
-/* Structure for handoff parameters to ARM Trusted Firmware (ATF) */
-struct xfsbl_atf_handoff_params {
-	uint8_t magic[4];
-	uint32_t num_entries;
-	struct xfsbl_partition partition[FSBL_MAX_PARTITIONS];
-};
 
 /**
  * @partition: Pointer to partition struct
@@ -150,7 +135,7 @@ static int32_t get_fsbl_estate(const struct xfsbl_partition *partition)
  * @bl33:	BL33 image info structure
  * atf_handoff_addr:  ATF handoff address
  *
- * Process the handoff paramters from the FSBL and populate the BL32 and BL33
+ * Process the handoff parameters from the FSBL and populate the BL32 and BL33
  * image info structures accordingly.
  *
  * Return: Return the status of the handoff. The value will be from the
@@ -161,8 +146,6 @@ enum fsbl_handoff fsbl_atf_handover(entry_point_info_t *bl32,
 					uint64_t atf_handoff_addr)
 {
 	const struct xfsbl_atf_handoff_params *ATFHandoffParams;
-	assert((atf_handoff_addr < BL31_BASE) ||
-	       (atf_handoff_addr > (uint64_t)&__BL31_END__));
 	if (!atf_handoff_addr) {
 		WARN("BL31: No ATF handoff structure passed\n");
 		return FSBL_HANDOFF_NO_STRUCT;

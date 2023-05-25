@@ -19,7 +19,7 @@
 					CSS_SGI_MAX_CPUS_PER_CLUSTER *	\
 					CSS_SGI_MAX_PE_PER_CPU)
 
-#define PLAT_ARM_TRUSTED_SRAM_SIZE	0x00040000	/* 256 KB */
+#define PLAT_ARM_TRUSTED_SRAM_SIZE	0x00080000	/* 512 KB */
 
 /* Remote chip address offset */
 #define CSS_SGI_REMOTE_CHIP_MEM_OFFSET(n)	\
@@ -99,10 +99,16 @@
 
 /*
  * Since BL31 NOBITS overlays BL2 and BL1-RW, PLAT_ARM_MAX_BL31_SIZE is
- * calculated using the current BL31 PROGBITS debug size plus the sizes of
- * BL2 and BL1-RW
+ * calculated using the current BL31 PROGBITS debug size plus the sizes of BL2
+ * and BL1-RW. CSS_SGI_BL31_SIZE - is tuned with respect to the actual BL31
+ * PROGBITS size which is around 64-68KB at the time this change is being made.
+ * A buffer of ~35KB is added to account for future expansion of the image,
+ * making it a total of 100KB.
  */
-#define PLAT_ARM_MAX_BL31_SIZE		0x48000
+#define CSS_SGI_BL31_SIZE		(100 * 1024)	/* 100 KB */
+#define PLAT_ARM_MAX_BL31_SIZE		(CSS_SGI_BL31_SIZE +		\
+						PLAT_ARM_MAX_BL2_SIZE +	\
+						PLAT_ARM_MAX_BL1_RW_SIZE)
 
 /*
  * Size of cacheable stacks
@@ -200,7 +206,7 @@
 
 #define PLAT_SP_PRI				PLAT_RAS_PRI
 
-#if SPM_MM && RAS_EXTENSION
+#if SPM_MM && RAS_FFH_SUPPORT
 /*
  * CPER buffer memory of 128KB is reserved and it is placed adjacent to the
  * memory shared between EL3 and S-EL0.
@@ -229,7 +235,7 @@
  */
 #define PLAT_ARM_SP_IMAGE_STACK_BASE	(PLAT_SP_IMAGE_NS_BUF_BASE +	\
 					 PLAT_SP_IMAGE_NS_BUF_SIZE)
-#endif /* SPM_MM && RAS_EXTENSION */
+#endif /* SPM_MM && RAS_FFH_SUPPORT */
 
 /* Platform ID address */
 #define SSC_VERSION                     (SSC_REG_BASE + SSC_VERSION_OFFSET)

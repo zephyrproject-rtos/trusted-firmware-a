@@ -315,7 +315,7 @@
 #define SGIR_IRM_SHIFT			40
 #define SGIR_IRM_MASK			ULL(0x1)
 #define SGIR_AFF3_SHIFT			48
-#define SGIR_AFF_MASK			ULL(0xf)
+#define SGIR_AFF_MASK			ULL(0xff)
 
 #define SGIR_IRM_TO_AFF			U(0)
 
@@ -353,6 +353,12 @@
 #include <common/interrupt_props.h>
 #include <drivers/arm/gic_common.h>
 #include <lib/utils_def.h>
+
+typedef enum {
+	GICV3_G1S,
+	GICV3_G1NS,
+	GICV3_G0
+} gicv3_irq_group_t;
 
 static inline uintptr_t gicv3_redist_size(uint64_t typer_val)
 {
@@ -575,7 +581,8 @@ void gicv3_set_interrupt_priority(unsigned int id, unsigned int proc_num,
 		unsigned int priority);
 void gicv3_set_interrupt_type(unsigned int id, unsigned int proc_num,
 		unsigned int type);
-void gicv3_raise_secure_g0_sgi(unsigned int sgi_num, u_register_t target);
+void gicv3_raise_sgi(unsigned int sgi_num, gicv3_irq_group_t group,
+					 u_register_t target);
 void gicv3_set_spi_routing(unsigned int id, unsigned int irm,
 		u_register_t mpidr);
 void gicv3_set_interrupt_pending(unsigned int id, unsigned int proc_num);
