@@ -16,6 +16,7 @@
 #include <drivers/delay_timer.h>
 #include <drivers/mmc.h>
 #include <lib/utils.h>
+#include <plat/common/common_def.h>
 
 #define MMC_DEFAULT_MAX_RETRIES		5
 #define SEND_OP_COND_MAX_RETRIES	100
@@ -25,6 +26,7 @@
 static const struct mmc_ops *ops;
 static unsigned int mmc_ocr_value;
 static struct mmc_csd_emmc mmc_csd;
+static struct sd_switch_status sd_switch_func_status;
 static unsigned char mmc_ext_csd[512] __aligned(16);
 static unsigned int mmc_flags;
 static struct mmc_device_info *mmc_dev_info;
@@ -42,6 +44,11 @@ static const unsigned char sd_tran_speed_base[16] = {
 static bool is_cmd23_enabled(void)
 {
 	return ((mmc_flags & MMC_FLAG_CMD23) != 0U);
+}
+
+static bool is_sd_cmd6_enabled(void)
+{
+	return ((mmc_flags & MMC_FLAG_SD_CMD6) != 0U);
 }
 
 static int mmc_send_cmd(unsigned int idx, unsigned int arg,
@@ -62,8 +69,7 @@ static int mmc_send_cmd(unsigned int idx, unsigned int arg,
 		int i;
 
 		for (i = 0; i < 4; i++) {
-			*r_data = cmd.resp_data[i];
-			r_data++;
+			r_data[i] = cmd.resp_data[i];
 		}
 	}
 
@@ -105,7 +111,7 @@ static int mmc_device_state(void)
 	return MMC_GET_STATE(resp_data[0]);
 }
 
-static int mmc_send_part_switch_cmd(unsigned int part_config)
+static int mmc_send_part_switch_cmd(unsigned char part_config)
 {
 	int ret;
 	unsigned int part_time = 0;
@@ -357,6 +363,33 @@ static int mmc_fill_device_info(void)
 	return 0;
 }
 
+static int sd_switch(unsigned int mode, unsigned char group,
+		     unsigned char func)
+{
+	unsigned int group_shift = (group - 1U) * 4U;
+	unsigned int group_mask = GENMASK(group_shift + 3U,  group_shift);
+	unsigned int arg;
+	int ret;
+
+	ret = ops->prepare(0, (uintptr_t)&sd_switch_func_status,
+			   sizeof(sd_switch_func_status));
+	if (ret != 0) {
+		return ret;
+	}
+
+	/* MMC CMD6: SWITCH_FUNC */
+	arg = mode | SD_SWITCH_ALL_GROUPS_MASK;
+	arg &= ~group_mask;
+	arg |= func << group_shift;
+	ret = mmc_send_cmd(MMC_CMD(6), arg, MMC_RESPONSE_R1, NULL);
+	if (ret != 0) {
+		return ret;
+	}
+
+	return ops->read(0, (uintptr_t)&sd_switch_func_status,
+			 sizeof(sd_switch_func_status));
+}
+
 static int sd_send_op_cond(void)
 {
 	int n;
@@ -418,11 +451,6 @@ static int mmc_send_op_cond(void)
 {
 	int ret, n;
 	unsigned int resp_data[4];
-
-	ret = mmc_reset_to_idle();
-	if (ret != 0) {
-		return ret;
-	}
 
 	for (n = 0; n < SEND_OP_COND_MAX_RETRIES; n++) {
 		ret = mmc_send_cmd(MMC_CMD(1), OCR_SECTOR_MODE |
@@ -524,7 +552,39 @@ static int mmc_enumerate(unsigned int clk, unsigned int bus_width)
 		return ret;
 	}
 
-	return mmc_fill_device_info();
+	ret = mmc_fill_device_info();
+	if (ret != 0) {
+		return ret;
+	}
+
+	if (is_sd_cmd6_enabled() &&
+	    (mmc_dev_info->mmc_dev_type == MMC_IS_SD_HC)) {
+		/* Try to switch to High Speed Mode */
+		ret = sd_switch(SD_SWITCH_FUNC_CHECK, 1U, 1U);
+		if (ret != 0) {
+			return ret;
+		}
+
+		if ((sd_switch_func_status.support_g1 & BIT(9)) == 0U) {
+			/* High speed not supported, keep default speed */
+			return 0;
+		}
+
+		ret = sd_switch(SD_SWITCH_FUNC_SWITCH, 1U, 1U);
+		if (ret != 0) {
+			return ret;
+		}
+
+		if ((sd_switch_func_status.sel_g2_g1 & 0x1U) == 0U) {
+			/* Cannot switch to high speed, keep default speed */
+			return 0;
+		}
+
+		mmc_dev_info->max_bus_freq = 50000000U;
+		ret = ops->set_ios(clk, bus_width);
+	}
+
+	return ret;
 }
 
 size_t mmc_read_blocks(int lba, uintptr_t buf, size_t size)
@@ -694,9 +754,9 @@ size_t mmc_erase_blocks(int lba, size_t size)
 	return size;
 }
 
-static int mmc_part_switch(unsigned int part_type)
+static int mmc_part_switch(unsigned char part_type)
 {
-	uint8_t part_config = mmc_ext_csd[CMD_EXTCSD_PARTITION_CONFIG];
+	unsigned char part_config = mmc_ext_csd[CMD_EXTCSD_PARTITION_CONFIG];
 
 	part_config &= ~EXT_CSD_PART_CONFIG_ACC_MASK;
 	part_config |= part_type;
@@ -714,8 +774,7 @@ int mmc_part_switch_current_boot(void)
 	unsigned char current_boot_part = mmc_current_boot_part();
 	int ret;
 
-	if (current_boot_part != 1U &&
-	    current_boot_part != 2U) {
+	if ((current_boot_part != 1U) && (current_boot_part != 2U)) {
 		ERROR("Got unexpected value for active boot partition, %u\n", current_boot_part);
 		return -EIO;
 	}
@@ -738,6 +797,11 @@ int mmc_part_switch_user(void)
 	}
 
 	return ret;
+}
+
+size_t mmc_boot_part_size(void)
+{
+	return mmc_ext_csd[CMD_EXTCSD_BOOT_SIZE_MULT] * SZ_128K;
 }
 
 size_t mmc_boot_part_read_blocks(int lba, uintptr_t buf, size_t size)

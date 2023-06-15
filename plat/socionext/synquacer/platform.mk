@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2018-2022, ARM Limited and Contributors. All rights reserved.
+# Copyright (c) 2018-2023, ARM Limited and Contributors. All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
 #
@@ -17,7 +17,7 @@ override TRUSTED_BOARD_BOOT     := 0
 SQ_USE_SCMI_DRIVER              ?= 0
 else
 override RESET_TO_BL31          := 0
-override BL2_AT_EL3             := 1
+override RESET_TO_BL2		:= 1
 SQ_USE_SCMI_DRIVER              := 1
 BL2_CPPFLAGS                    += -DPLAT_XLAT_TABLES_DYNAMIC
 endif
@@ -73,12 +73,12 @@ $(BUILD_PLAT)/bl2/sq_rotpk.o: $(ROTPK_HASH)
 certificates: $(ROT_KEY)
 $(ROT_KEY): | $(BUILD_PLAT)
 	@echo "  OPENSSL $@"
-	$(Q)openssl genrsa 2048 > $@ 2>/dev/null
+	$(Q)${OPENSSL_BIN_PATH}/openssl genrsa 2048 > $@ 2>/dev/null
 
 $(ROTPK_HASH): $(ROT_KEY)
 	@echo "  OPENSSL $@"
-	$(Q)openssl rsa -in $< -pubout -outform DER 2>/dev/null |\
-	openssl dgst -sha256 -binary > $@ 2>/dev/null
+	$(Q)${OPENSSL_BIN_PATH}/openssl rsa -in $< -pubout -outform DER 2>/dev/null |\
+	${OPENSSL_BIN_PATH}/openssl dgst -sha256 -binary > $@ 2>/dev/null
 
 endif	# TRUSTED_BOARD_BOOT
 endif

@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2018-2020, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2018-2020, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -14,10 +15,10 @@
 #include <plat/common/platform.h>
 
 #include "pm_api_pinctrl.h"
-#include "pm_api_sys.h"
 #include "pm_client.h"
 #include "pm_common.h"
 #include "pm_ipi.h"
+#include "zynqmp_pm_api_sys.h"
 
 struct pinctrl_function {
 	char name[FUNCTION_NAME_LEN];
@@ -27,7 +28,7 @@ struct pinctrl_function {
 };
 
 /* Max groups for one pin */
-#define MAX_PIN_GROUPS	U(13)
+#define MAX_PIN_GROUPS	(13U)
 
 struct zynqmp_pin_group {
 	uint16_t (*groups)[];
@@ -2037,7 +2038,7 @@ enum pm_ret_status pm_api_pinctrl_get_function_groups(uint32_t fid,
 {
 	uint16_t grps;
 	uint16_t end_of_grp_offset;
-	unsigned int i;
+	uint16_t i;
 
 	if (fid >= MAX_FUNCTION) {
 		return PM_RET_ERROR_ARGS;
@@ -2048,7 +2049,7 @@ enum pm_ret_status pm_api_pinctrl_get_function_groups(uint32_t fid,
 	grps = pinctrl_functions[fid].group_base;
 	end_of_grp_offset = grps + pinctrl_functions[fid].group_size;
 
-	for (i = 0; i < NUM_GROUPS_PER_RESP; i++) {
+	for (i = 0U; i < NUM_GROUPS_PER_RESP; i++) {
 		if ((grps + index + i) >= end_of_grp_offset) {
 			break;
 		}

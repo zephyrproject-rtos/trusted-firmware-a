@@ -4,7 +4,6 @@ Components
 .. toctree::
    :maxdepth: 1
    :caption: Contents
-   :numbered:
 
    spd/index
    activity-monitors
@@ -20,6 +19,7 @@ Components
    romlib-design
    sdei
    secure-partition-manager
+   el3-spmc
    secure-partition-manager-mm
    xlat-tables-lib-v2-design
    cot-binding
