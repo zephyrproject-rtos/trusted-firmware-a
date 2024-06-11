@@ -1061,7 +1061,7 @@ ENCTOOL			?=	${ENCTOOLPATH}/encrypt_fw${BIN_EXT}
 
 # Variables for use with Firmware Image Package
 FIPTOOLPATH		?=	tools/fiptool
-FIPTOOL			?=	${BUILD_PLAT}/fiptool${BIN_EXT}
+FIPTOOL			?=	${FIPTOOLPATH}/fiptool${BIN_EXT}
 
 # Variables for use with sptool
 SPTOOLPATH		?=	tools/sptool
