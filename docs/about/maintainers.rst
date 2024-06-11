@@ -2,12 +2,11 @@ Project Maintenance
 ===================
 
 Trusted Firmware-A (TF-A) is an open governance community project. All
-contributions are ultimately merged by the maintainers listed below. Technical
-ownership of most parts of the codebase falls on the code owners listed
-below. An acknowledgement from these code owners is required before the
-maintainers merge a contribution.
+contributions are reviewed and merged by the community members listed below.
 
-More details may be found in the `Project Maintenance Process`_ document.
+For more details on the roles of `maintainers`, `code owners` and general
+information about code reviews in TF-A project, please refer to the :ref:`Code
+Review Guidelines`.
 
 .. |M| replace:: **Mail**
 .. |G| replace:: **GitHub ID**
@@ -17,6 +16,10 @@ More details may be found in the `Project Maintenance Process`_ document.
 
 Maintainers
 -----------
+
+.. note::
+   If you wish to become a maintainer for TF-A project, please refer to the
+   :ref:`Project Maintenance Processes`.
 
 :|M|: Dan Handley <dan.handley@arm.com>
 :|G|: `danh-arm`_
@@ -50,6 +53,8 @@ Maintainers
 :|G|: `raghuncstate`_
 :|M|: Manish Badarkhe <manish.badarkhe@arm.com>
 :|G|: `ManishVB-Arm`_
+:|M|: Yann Gautier <yann.gautier@st.com>
+:|G|: `Yann-lms`_
 
 LTS Maintainers
 ---------------
@@ -62,6 +67,8 @@ LTS Maintainers
 :|G|: `bytefire`_
 :|M|: Varun Wadekar <vwadekar@nvidia.com>
 :|G|: `vwadekar`_
+:|M|: Yann Gautier <yann.gautier@st.com>
+:|G|: `Yann-lms`_
 
 .. _code owners:
 
@@ -191,12 +198,14 @@ Arm® Ethos™-N NPU driver
 
 JTAG DCC console driver
 ^^^^^^^^^^^^^^^^^^^^^^^
-:M: Michal Simek <michal.simek@amd.com>
-:G: `michalsimek`_
-:M: Venkatesh Yadav Abbarapu <venkatesh.abbarapu@amd.com>
-:G: `venkatesh`_
-:F: drivers/arm/dcc/
-:F: include/drivers/arm/dcc.h
+:|M|: Michal Simek <michal.simek@amd.com>
+:|G|: `michalsimek`_
+:|M|: Amit Nagal <amit.nagal@amd.com>
+:|G|: `amit-nagal`_
+:|M|: Akshay Belsare <akshay.belsare@amd.com>
+:|G|: `Akshay-Belsare`_
+:|F|: drivers/arm/dcc/
+:|F|: include/drivers/arm/dcc.h
 
 Power State Coordination Interface (PSCI)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -415,6 +424,15 @@ Granule Protection Tables Library (GPT-RME)
 :|F|: lib/gpt_rme
 :|F|: include/lib/gpt_rme
 
+Firmware Handoff Library (Transfer List)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+:|M|: Raymond Mao <raymond.mao@linaro.org>
+:|G|: `raymo200915`_
+:|M|: Harrison Mutai <harrison.mutai@arm.com>
+:|G|: `harrisonmutai-arm`_
+:|F|: lib/transfer_list
+:|F|: include/lib/transfer_list.h
+
 Platform Ports
 ~~~~~~~~~~~~~~
 
@@ -494,8 +512,8 @@ Arm Rich IoT Platform ports
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 :|M|: Abdellatif El Khlifi <abdellatif.elkhlifi@arm.com>
 :|G|: `abdellatif-elkhlifi`_
-:|M|: Vishnu Banavath <vishnu.banavath@arm.com>
-:|G|: `vishnu-banavath`_
+:|M|: Xueliang Zhong <xueliang.zhong@arm.com>
+:|G|: `xueliang-zhong-arm`_
 :|F|: plat/arm/board/corstone700
 :|F|: plat/arm/board/a5ds
 :|F|: plat/arm/board/corstone1000
@@ -521,6 +539,15 @@ Arm Total Compute platform port
 :|M|: Rupinderjit Singh <rupinderjit.singh@arm.com>
 :|G|: `rupsin01`_
 :|F|: plat/arm/board/tc
+
+Aspeed platform port
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+:|M|: Chia-Wei Wang <chiawei_wang@aspeedtech.com>
+:|G|: `ChiaweiW`_
+:|M|: Neal Liu <neal_liu@aspeedtech.com>
+:|G|: `Neal-liu`_
+:|F|: docs/plat/ast2700.rst
+:|F|: plat/aspeed/
 
 HiSilicon HiKey and HiKey960 platform ports
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -569,6 +596,20 @@ Marvell platform ports and SoC drivers
 :|F|: drivers/marvell/
 :|F|: tools/marvell/
 
+Nuvoton npcm845x platform port
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+:|M|: Hila Miranda-Kuzi <hila.miranda.kuzi1@gmail.com>
+:|G|: `hilamirandakuzi1`_
+:|M|: Margarita Glushkin <rutigl@gmail.com>
+:|G|: `rutigl`_
+:|M|: Avi Fishman <avi.fishman@nuvoton.com>
+:|G|: `avifishman`_
+:|F|: docs/plat/npcm845x.rst
+:|F|: drivers/nuvoton/
+:|F|: include/drivers/nuvoton/
+:|F|: include/plat/nuvoton/
+:|F|: plat/nuvoton/
+
 NVidia platform ports
 ^^^^^^^^^^^^^^^^^^^^^
 :|M|: Varun Wadekar <vwadekar@nvidia.com>
@@ -604,6 +645,13 @@ NXP i.MX8M platform port
 :|G|: `JackyBai`_
 :|F|: docs/plat/imx8m.rst
 :|F|: plat/imx/imx8m/
+
+NXP i.MX9 platform port
+^^^^^^^^^^^^^^^^^^^^^^^^
+:|M|: Jacky Bai <ping.bai@nxp.com>
+:|G|: `JackyBai`_
+:|F|: docs/plat/imx9.rst
+:|F|: plat/imx/imx93/
 
 NXP QorIQ Layerscape common code for platform ports
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -684,7 +732,10 @@ QTI MSM8916 platform port
 :|M|: Nikita Travkin <nikita@trvn.ru>
 :|G|: `TravMurav`_
 :|F|: docs/plat/qti-msm8916.rst
+:|F|: plat/qti/mdm9607/
+:|F|: plat/qti/msm8909/
 :|F|: plat/qti/msm8916/
+:|F|: plat/qti/msm8939/
 
 Raspberry Pi 3 platform port
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -708,8 +759,6 @@ Raspberry Pi 4 platform port
 
 Renesas rcar-gen3 platform port
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-:|M|: Jorge Ramirez-Ortiz  <jramirez@baylibre.com>
-:|G|: `ldts`_
 :|M|: Marek Vasut <marek.vasut@gmail.com>
 :|G|: `marex`_
 :|F|: docs/plat/rcar-gen3.rst
@@ -749,6 +798,7 @@ STM32MP1 platform port
 ^^^^^^^^^^^^^^^^^^^^^^
 :|M|: Yann Gautier <yann.gautier@st.com>
 :|G|: `Yann-lms`_
+:|F|: docs/plat/st/*
 :|F|: docs/plat/stm32mp1.rst
 :|F|: drivers/st/
 :|F|: fdts/stm32\*
@@ -781,8 +831,10 @@ Xilinx platform port
 ^^^^^^^^^^^^^^^^^^^^
 :|M|: Michal Simek <michal.simek@amd.com>
 :|G|: `michalsimek`_
-:|M|: Venkatesh Yadav Abbarapu <venkatesh.abbarapu@amd.com>
-:|G|: `venkatesh`_
+:|M|: Amit Nagal <amit.nagal@amd.com>
+:|G|: `amit-nagal`_
+:|M|: Akshay Belsare <akshay.belsare@amd.com>
+:|G|: `Akshay-Belsare`_
 :|F|: docs/plat/xilinx\*
 :|F|: plat/xilinx/
 
@@ -916,7 +968,6 @@ Conventional Changelog Extensions
 .. _jwerner-chromium: https://github.com/jwerner-chromium
 .. _kostapr: https://github.com/kostapr
 .. _lachitp: https://github.com/lachitp
-.. _ldts: https://github.com/ldts
 .. _marex: https://github.com/marex
 .. _masahir0y: https://github.com/masahir0y
 .. _michalsimek: https://github.com/michalsimek
@@ -946,7 +997,6 @@ Conventional Changelog Extensions
 .. _TonyXie06: https://github.com/TonyXie06
 .. _TravMurav: https://github.com/TravMurav
 .. _vwadekar: https://github.com/vwadekar
-.. _venkatesh: https://github.com/vabbarap
 .. _Yann-lms: https://github.com/Yann-lms
 .. _manish-pandey-arm: https://github.com/manish-pandey-arm
 .. _mardyk01: https://github.com/mardyk01
@@ -978,5 +1028,13 @@ Conventional Changelog Extensions
 .. _bytefire: https://github.com/bytefire
 .. _rupsin01: https://github.com/rupsin01
 .. _jimmy-brisson: https://github.com/theotherjimmy
-
-.. _Project Maintenance Process: https://developer.trustedfirmware.org/w/collaboration/project-maintenance-process/
+.. _ChiaweiW: https://github.com/chiaweiw
+.. _Neal-liu: https://github.com/neal-liu
+.. _amit-nagal: https://github.com/amit-nagal
+.. _Akshay-Belsare: https://github.com/Akshay-Belsare
+.. _hilamirandakuzi1: https://github.com/hilamirandakuzi1
+.. _rutigl: https://github.com/rutigl
+.. _avifishman: https://github.com/avifishman
+.. _xueliang-zhong-arm: https://github.com/xueliang-zhong-arm
+.. _raymo200915: https://github.com/raymo200915
+.. _harrisonmutai-arm: https://github.com/harrisonmutai-arm

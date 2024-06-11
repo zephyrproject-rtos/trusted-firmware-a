@@ -90,38 +90,6 @@ Arm Platform Build Options
    of the translation tables library instead of version 2. It is set to 0 by
    default, which selects version 2.
 
--  ``ARM_CRYPTOCELL_INTEG`` : bool option to enable TF-A to invoke Arm®
-   TrustZone® CryptoCell functionality for Trusted Board Boot on capable Arm
-   platforms. If this option is specified, then the path to the CryptoCell
-   SBROM library must be specified via ``CCSBROM_LIB_PATH`` flag.
-
--  ``ARM_ETHOSN_NPU_DRIVER``: boolean option to enable a SiP service that can
-   configure an Arm® Ethos™-N NPU. To use this service the target platform's
-   ``HW_CONFIG`` must include the device tree nodes for the NPU. Currently, only
-   the Arm Juno platform has this included in its ``HW_CONFIG`` and the platform
-   only loads the ``HW_CONFIG`` in AArch64 builds. Default is 0.
-
--  ``ARM_ETHOSN_NPU_TZMP1``: boolean option to enable TZMP1 support for the
-   Arm® Ethos™-N NPU. Requires ``ARM_ETHOSN_NPU_DRIVER`` and
-   ``TRUSTED_BOARD_BOOT`` to be enabled.
-
--  ``ARM_ETHOSN_NPU_FW``: location of the NPU firmware binary
-   (```ethosn.bin```). This firmware image will be included in the FIP and
-   loaded at runtime.
-
--  ``ARM_SPMC_MANIFEST_DTS`` : path to an alternate manifest file used as the
-   SPMC Core manifest. Valid when ``SPD=spmd`` is selected.
-
--  ``ARM_BL2_SP_LIST_DTS``: Path to DTS file snippet to override the hardcoded
-   SP nodes in tb_fw_config.
-
--  ``OPTEE_SP_FW_CONFIG``: DTC build flag to include OP-TEE as SP in tb_fw_config
-   device tree. This flag is defined only when ``ARM_SPMC_MANIFEST_DTS`` manifest
-   file name contains pattern optee_sp.
-
--  ``TS_SP_FW_CONFIG``: DTC build flag to include Trusted Services (Crypto and
-   internal-trusted-storage) as SP in tb_fw_config device tree.
-
 -  ``ARM_GPT_SUPPORT``: Enable GPT parser to get the entry address and length of
    the various partitions present in the GPT image. This support is available
    only for the BL2 component, and it is disabled by default.
@@ -168,6 +136,21 @@ Arm CSS Platform-Specific Build Options
    CPU core on reset. This build option can be used on CSS platforms that
    require all the CPUs to execute the CPU specific power down sequence to
    complete a warm reboot sequence in which only the CPUs are power cycled.
+
+Arm FVP Build Options
+---------------------
+
+- ``FVP_TRUSTED_SRAM_SIZE``: Size (in kilobytes) of the Trusted SRAM region to
+  utilize when building for the FVP platform. This option defaults to 256.
+
+Arm Juno Build Options
+----------------------
+
+-  ``JUNO_AARCH32_EL3_RUNTIME``: This build flag enables you to execute EL3
+   runtime software in AArch32 mode, which is required to run AArch32 on Juno.
+   By default this flag is set to '0'. Enabling this flag builds BL1 and BL2 in
+   AArch64 and facilitates the loading of ``SP_MIN`` and BL33 as AArch32 executable
+   images.
 
 --------------
 

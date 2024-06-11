@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019-2023, ARM Limited. All rights reserved.
+ * Copyright (c) 2019-2023, Arm Limited. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -42,7 +42,11 @@
 #define NEOVERSE_V1_ACTLR2_EL1_BIT_40				(ULL(1) << 40)
 
 #define NEOVERSE_V1_ACTLR3_EL1					S3_0_C15_C1_2
+#define NEOVERSE_V1_ACTLR3_EL1_BIT_47				(ULL(1) << 47)
 
 #define NEOVERSE_V1_ACTLR5_EL1					S3_0_C15_C9_0
+#define NEOVERSE_V1_ACTLR5_EL1_BIT_55				(ULL(1) << 55)
+#define NEOVERSE_V1_ACTLR5_EL1_BIT_56				(ULL(1) << 56)
+#define NEOVERSE_V1_ACTLR5_EL1_BIT_61				(ULL(1) << 61)
 
 #endif /* NEOVERSE_V1_H */

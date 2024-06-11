@@ -319,13 +319,6 @@ also be defined:
    Firmware Update (FWU) certificate identifier, used by NS_BL1U to load the
    FWU content certificate.
 
--  **#define : PLAT_CRYPTOCELL_BASE**
-
-   This defines the base address of Arm® TrustZone® CryptoCell and must be
-   defined if CryptoCell crypto driver is used for Trusted Board Boot. For
-   capable Arm platforms, this driver is used if ``ARM_CRYPTOCELL_INTEG`` is
-   set.
-
 If the AP Firmware Updater Configuration image, BL2U is used, the following
 must also be defined:
 
@@ -591,32 +584,32 @@ configuration must be performed:
 If the platform port uses the Arm® Ethos™-N NPU driver with TZMP1 support
 enabled, the following constants and configuration must also be defined:
 
-- **ARM_ETHOSN_NPU_PROT_FW_NSAID**
+- **ETHOSN_NPU_PROT_FW_NSAID**
 
   Defines the Non-secure Access IDentity (NSAID) that the NPU shall use to
   access the protected memory that contains the NPU's firmware.
 
-- **ARM_ETHOSN_NPU_PROT_DATA_RW_NSAID**
+- **ETHOSN_NPU_PROT_DATA_RW_NSAID**
 
   Defines the Non-secure Access IDentity (NSAID) that the NPU shall use for
   read/write access to the protected memory that contains inference data.
 
-- **ARM_ETHOSN_NPU_PROT_DATA_RO_NSAID**
+- **ETHOSN_NPU_PROT_DATA_RO_NSAID**
 
   Defines the Non-secure Access IDentity (NSAID) that the NPU shall use for
   read-only access to the protected memory that contains inference data.
 
-- **ARM_ETHOSN_NPU_NS_RW_DATA_NSAID**
+- **ETHOSN_NPU_NS_RW_DATA_NSAID**
 
   Defines the Non-secure Access IDentity (NSAID) that the NPU shall use for
   read/write access to the non-protected memory.
 
-- **ARM_ETHOSN_NPU_NS_RO_DATA_NSAID**
+- **ETHOSN_NPU_NS_RO_DATA_NSAID**
 
   Defines the Non-secure Access IDentity (NSAID) that the NPU shall use for
   read-only access to the non-protected memory.
 
-- **ARM_ETHOSN_NPU_FW_IMAGE_BASE** and **ARM_ETHOSN_NPU_FW_IMAGE_LIMIT**
+- **ETHOSN_NPU_FW_IMAGE_BASE** and **ETHOSN_NPU_FW_IMAGE_LIMIT**
 
   Defines the physical address range that the NPU's firmware will be loaded
   into and executed from.
@@ -634,10 +627,10 @@ enabled, the following constants and configuration must also be defined:
 - Add MMU mappings such that:
 
  - BL2 can write the NPU firmware into the region defined by
-   ``ARM_ETHOSN_NPU_FW_IMAGE_BASE`` and ``ARM_ETHOSN_NPU_FW_IMAGE_LIMIT``
+   ``ETHOSN_NPU_FW_IMAGE_BASE`` and ``ETHOSN_NPU_FW_IMAGE_LIMIT``
  - BL31 (SiP service) can read the NPU firmware from the same region
 
-- Add the firmware image ID ``ARM_ETHOSN_NPU_FW_IMAGE_ID`` to the list of images
+- Add the firmware image ID ``ETHOSN_NPU_FW_IMAGE_ID`` to the list of images
   loaded by BL2.
 
 Please see the reference implementation code for the Juno platform as an example.
@@ -1509,43 +1502,6 @@ This function returns SMC_ARCH_CALL_SUCCESS if the platform supports
 the SMCCC function specified in the argument; otherwise returns
 SMC_ARCH_CALL_NOT_SUPPORTED.
 
-Function : plat_mboot_measure_image()
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-::
-
-    Argument : unsigned int, image_info_t *
-    Return   : int
-
-When the MEASURED_BOOT flag is enabled:
-
--  This function measures the given image and records its measurement using
-   the measured boot backend driver.
--  On the Arm FVP port, this function measures the given image using its
-   passed id and information and then records that measurement in the
-   Event Log buffer.
--  This function must return 0 on success, a signed integer error code
-   otherwise.
-
-When the MEASURED_BOOT flag is disabled, this function doesn't do anything.
-
-Function : plat_mboot_measure_critical_data()
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-::
-
-    Argument : unsigned int, const void *, size_t
-    Return   : int
-
-When the MEASURED_BOOT flag is enabled:
-
--  This function measures the given critical data structure and records its
-   measurement using the measured boot backend driver.
--  This function must return 0 on success, a signed integer error code
-   otherwise.
-
-When the MEASURED_BOOT flag is disabled, this function doesn't do anything.
-
 Function : plat_can_cmo()
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -1813,42 +1769,6 @@ This function must return 0 on success, a non-null error code otherwise.
 The default implementation of this function asserts therefore platforms must
 override it when using the FWU feature.
 
-Function : bl1_plat_mboot_init() [optional]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-::
-
-    Argument : void
-    Return   : void
-
-When the MEASURED_BOOT flag is enabled:
-
--  This function is used to initialize the backend driver(s) of measured boot.
--  On the Arm FVP port, this function is used to initialize the Event Log
-   backend driver, and also to write header information in the Event Log buffer.
-
-When the MEASURED_BOOT flag is disabled, this function doesn't do anything.
-
-Function : bl1_plat_mboot_finish() [optional]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-::
-
-    Argument : void
-    Return   : void
-
-When the MEASURED_BOOT flag is enabled:
-
--  This function is used to finalize the measured boot backend driver(s),
-   and also, set the information for the next bootloader component to
-   extend the measurement if needed.
--  On the Arm FVP port, this function is used to pass the base address of
-   the Event Log buffer and its size to BL2 via tb_fw_config to extend the
-   Event Log buffer with the measurement of various images loaded by BL2.
-   It results in panic on error.
-
-When the MEASURED_BOOT flag is disabled, this function doesn't do anything.
-
 Boot Loader Stage 2 (BL2)
 -------------------------
 
@@ -1979,42 +1899,6 @@ This function moves the current boot redundancy source to the next
 element in the boot sequence. If there are no more boot sources then it
 must return 0, otherwise it must return 1. The default implementation
 of this always returns 0.
-
-Function : bl2_plat_mboot_init() [optional]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-::
-
-    Argument : void
-    Return   : void
-
-When the MEASURED_BOOT flag is enabled:
-
--  This function is used to initialize the backend driver(s) of measured boot.
--  On the Arm FVP port, this function is used to initialize the Event Log
-   backend driver with the Event Log buffer information (base address and
-   size) received from BL1. It results in panic on error.
-
-When the MEASURED_BOOT flag is disabled, this function doesn't do anything.
-
-Function : bl2_plat_mboot_finish() [optional]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-::
-
-    Argument : void
-    Return   : void
-
-When the MEASURED_BOOT flag is enabled:
-
--  This function is used to finalize the measured boot backend driver(s),
-   and also, set the information for the next bootloader component to extend
-   the measurement if needed.
--  On the Arm FVP port, this function is used to pass the Event Log buffer
-   information (base address and size) to non-secure(BL33) and trusted OS(BL32)
-   via nt_fw and tos_fw config respectively. It results in panic on error.
-
-When the MEASURED_BOOT flag is disabled, this function doesn't do anything.
 
 Boot Loader Stage 2 (BL2) at EL3
 --------------------------------
@@ -2818,6 +2702,17 @@ power down state where as it could be either power down, retention or run state
 for the higher power domain levels depending on the result of state
 coordination. The generic code expects the handler to succeed.
 
+plat_psci_ops.pwr_domain_validate_suspend() [optional]
+......................................................
+
+This is an optional function that is only compiled into the build if the build
+option ``PSCI_OS_INIT_MODE`` is enabled.
+
+If implemented, this function allows the platform to perform platform specific
+validations based on hardware states. The generic code expects this function to
+return PSCI_E_SUCCESS on success, or either PSCI_E_DENIED or
+PSCI_E_INVALID_PARAMS as appropriate for any invalid requests.
+
 plat_psci_ops.pwr_domain_suspend_pwrdown_early() [optional]
 ...........................................................
 
@@ -2875,10 +2770,6 @@ system. The context of the Distributor can be large and may require it to be
 allocated in a special area if it cannot fit in the platform's global static
 data, for example in DRAM. The Distributor can then be powered down using an
 implementation-defined sequence.
-
-If the build option ``PSCI_OS_INIT_MODE`` is enabled, the generic code expects
-the platform to return PSCI_E_SUCCESS on success, or either PSCI_E_DENIED or
-PSCI_E_INVALID_PARAMS as appropriate for any invalid requests.
 
 plat_psci_ops.pwr_domain_pwr_down_wfi()
 .......................................
@@ -3400,10 +3291,10 @@ Function : plat_ea_handler
     Argument : uint64_t
     Return   : void
 
-This function is invoked by the RAS framework for the platform to handle an
-External Abort received at EL3. The intention of the function is to attempt to
-resolve the cause of External Abort and return; if that's not possible, to
-initiate orderly shutdown of the system.
+This function is invoked by the runtime exception handling framework for the
+platform to handle an External Abort received at EL3. The intention of the
+function is to attempt to resolve the cause of External Abort and return;
+if that's not possible then an orderly shutdown of the system is initiated.
 
 The first parameter (``int ea_reason``) indicates the reason for External Abort.
 Its value is one of ``ERROR_EA_*`` constants defined in ``ea_handle.h``.
@@ -3418,13 +3309,8 @@ The third parameter (``void *cookie``) is unused for now. The fourth parameter
 (``uint64_t flags``) indicates the preempted security state. These parameters
 are received from the top-level exception handler.
 
-If ``RAS_FFH_SUPPORT`` is set to ``1``, the default implementation of this
-function iterates through RAS handlers registered by the platform. If any of the
-RAS handlers resolve the External Abort, no further action is taken.
-
-If ``RAS_FFH_SUPPORT`` is set to ``0``, or if none of the platform RAS handlers
-could resolve the External Abort, the default implementation prints an error
-message, and panics.
+This function must be implemented if a platform expects Firmware First handling
+of External Aborts.
 
 Function : plat_handle_uncontainable_ea
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3565,6 +3451,15 @@ build system.
    to ``no``. If any of the options ``EL3_PAYLOAD_BASE`` or ``PRELOADED_BL33_BASE``
    are used, this flag will be set to ``no`` automatically.
 
+-  **ARM_ARCH_MAJOR and ARM_ARCH_MINOR**
+   By default, ARM_ARCH_MAJOR.ARM_ARCH_MINOR is set to 8.0 in ``defaults.mk``,
+   if the platform makefile/build defines or uses the correct ARM_ARCH_MAJOR and
+   ARM_ARCH_MINOR then mandatory Architectural features available for that Arch
+   version will be enabled by default and any optional Arch feature supported by
+   the Architecture and available in TF-A can be enabled from platform specific
+   makefile. Look up to ``arch_features.mk`` for details pertaining to mandatory
+   and optional Arch specific features.
+
 Platform include paths
 ----------------------
 
@@ -3657,11 +3552,17 @@ by the drivers and callers, as the system does not yet provide a means of
 dynamically allocating memory. This may also have the affect of limiting the
 amount of open resources per driver.
 
+Measured Boot Platform Interface
+--------------------------------
+
+Enabling the MEASURED_BOOT flag adds extra platform requirements. Please refer
+to :ref:`Measured Boot Design` for more details.
+
 --------------
 
 *Copyright (c) 2013-2023, Arm Limited and Contributors. All rights reserved.*
 
-.. _PSCI: http://infocenter.arm.com/help/topic/com.arm.doc.den0022c/DEN0022C_Power_State_Coordination_Interface.pdf
+.. _PSCI: https://developer.arm.com/documentation/den0022/latest/
 .. _Arm Generic Interrupt Controller version 2.0 (GICv2): http://infocenter.arm.com/help/topic/com.arm.doc.ihi0048b/index.html
 .. _3.0 (GICv3): http://infocenter.arm.com/help/topic/com.arm.doc.ihi0069b/index.html
 .. _FreeBSD: https://www.freebsd.org

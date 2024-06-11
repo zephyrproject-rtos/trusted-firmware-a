@@ -24,6 +24,13 @@ FVP_GICR_REGION_PROTECTION		:= 0
 
 FVP_DT_PREFIX		:= fvp-base-gicv3-psci
 
+# Size (in kilobytes) of the Trusted SRAM region to  utilize when building for
+# the FVP platform. This option defaults to 256.
+FVP_TRUSTED_SRAM_SIZE	:= 256
+
+# Macro to enable helpers for running SPM tests. Disabled by default.
+PLAT_TEST_SPM	:= 0
+
 # This is a very trickly TEMPORARY fix. Enabling ALL features exceeds BL31's
 # progbits limit. We need a way to build all useful configurations while waiting
 # on the fvp to increase its SRAM size. The problem is twofild:
@@ -46,15 +53,12 @@ ifneq (${SPD}, tspd)
 	ENABLE_FEAT_AMU			:= 2
 	ENABLE_FEAT_AMUv1p1		:= 2
 	ENABLE_FEAT_HCX			:= 2
-	ENABLE_MPAM_FOR_LOWER_ELS	:= 2
 	ENABLE_FEAT_RNG			:= 2
 	ENABLE_FEAT_TWED		:= 2
 	ENABLE_FEAT_GCS			:= 2
-	ENABLE_FEAT_RAS			:= 2
 ifeq (${ARCH}, aarch64)
 ifneq (${SPD}, spmd)
 ifeq (${SPM_MM}, 0)
-ifeq (${ENABLE_RME}, 0)
 ifeq (${CTX_INCLUDE_FPREGS}, 0)
 	ENABLE_SME_FOR_NS		:= 2
 	ENABLE_SME2_FOR_NS		:= 2
@@ -63,19 +67,17 @@ endif
 endif
 endif
 endif
-endif
 
 # enable unconditionally for all builds
 ifeq (${ARCH}, aarch64)
-ifeq (${ENABLE_RME},0)
-	ENABLE_BRBE_FOR_NS		:= 2
+    ENABLE_BRBE_FOR_NS		:= 2
+    ENABLE_TRBE_FOR_NS		:= 2
 endif
-endif
-ENABLE_TRBE_FOR_NS		:= 2
 ENABLE_SYS_REG_TRACE_FOR_NS	:= 2
 ENABLE_FEAT_CSV2_2		:= 2
 ENABLE_FEAT_DIT			:= 2
 ENABLE_FEAT_PAN			:= 2
+ENABLE_FEAT_MTE_PERM		:= 2
 ENABLE_FEAT_VHE			:= 2
 CTX_INCLUDE_NEVE_REGS		:= 2
 ENABLE_FEAT_SEL2		:= 2
@@ -103,6 +105,9 @@ $(eval $(call add_define,FVP_MAX_PE_PER_CPU))
 
 # Pass FVP_GICR_REGION_PROTECTION to the build system.
 $(eval $(call add_define,FVP_GICR_REGION_PROTECTION))
+
+# Pass FVP_TRUSTED_SRAM_SIZE to the build system.
+$(eval $(call add_define,FVP_TRUSTED_SRAM_SIZE))
 
 # Sanity check the cluster count and if FVP_CLUSTER_COUNT <= 2,
 # choose the CCI driver , else the CCN driver
@@ -197,14 +202,21 @@ else
 					lib/cpus/aarch64/cortex_a76ae.S		\
 					lib/cpus/aarch64/cortex_a77.S		\
 					lib/cpus/aarch64/cortex_a78.S		\
+					lib/cpus/aarch64/cortex_a78_ae.S	\
 					lib/cpus/aarch64/cortex_a78c.S		\
 					lib/cpus/aarch64/cortex_a710.S		\
+					lib/cpus/aarch64/cortex_a715.S		\
+					lib/cpus/aarch64/cortex_a720.S		\
 					lib/cpus/aarch64/neoverse_n_common.S	\
 					lib/cpus/aarch64/neoverse_n1.S		\
 					lib/cpus/aarch64/neoverse_n2.S		\
 					lib/cpus/aarch64/neoverse_v1.S		\
 					lib/cpus/aarch64/neoverse_e1.S		\
-					lib/cpus/aarch64/cortex_x2.S
+					lib/cpus/aarch64/cortex_x2.S		\
+					lib/cpus/aarch64/cortex_x4.S		\
+					lib/cpus/aarch64/cortex_gelas.S		\
+					lib/cpus/aarch64/nevis.S		\
+					lib/cpus/aarch64/travis.S
 	endif
 	# AArch64/AArch32 cores
 	FVP_CPU_LIBS	+=	lib/cpus/aarch64/cortex_a55.S		\
@@ -213,7 +225,8 @@ endif
 
 else
 FVP_CPU_LIBS		+=	lib/cpus/aarch32/cortex_a32.S			\
-				lib/cpus/aarch32/cortex_a57.S
+				lib/cpus/aarch32/cortex_a57.S			\
+				lib/cpus/aarch32/cortex_a53.S
 endif
 
 BL1_SOURCES		+=	drivers/arm/smmu/smmu_v3.c			\
@@ -257,11 +270,6 @@ BL2_SOURCES		+=	plat/arm/board/fvp/aarch64/fvp_helpers.S
 
 BL31_SOURCES		+=	plat/arm/board/fvp/fvp_plat_attest_token.c	\
 				plat/arm/board/fvp/fvp_realm_attest_key.c
-
-# FVP platform does not support RSS, but it can leverage RSS APIs to
-# provide hardcoded token/key on request.
-BL31_SOURCES		+=	lib/psa/delegated_attestation.c
-
 endif
 
 ifeq (${ENABLE_FEAT_RNG_TRAP},1)
@@ -346,6 +354,10 @@ FVP_TOS_FW_CONFIG	:=	${BUILD_PLAT}/fdts/${PLAT}_tsp_fw_config.dtb
 $(eval $(call TOOL_ADD_PAYLOAD,${FVP_TOS_FW_CONFIG},--tos-fw-config,${FVP_TOS_FW_CONFIG}))
 endif
 
+ifeq (${TRANSFER_LIST}, 1)
+include lib/transfer_list/transfer_list.mk
+endif
+
 ifeq (${SPD},spmd)
 
 ifeq ($(ARM_SPMC_MANIFEST_DTS),)
@@ -388,16 +400,16 @@ BL31_SOURCES		+=	lib/cpus/aarch64/cortex_a75_pubsub.c	\
 endif
 endif
 
-ifeq (${RAS_FFH_SUPPORT},1)
+ifeq (${HANDLE_EA_EL3_FIRST_NS},1)
+ifeq (${ENABLE_FEAT_RAS},1)
 BL31_SOURCES		+=	plat/arm/board/fvp/aarch64/fvp_ras.c
+else
+BL31_SOURCES		+= 	plat/arm/board/fvp/aarch64/fvp_ea.c
+endif
 endif
 
 ifneq (${ENABLE_STACK_PROTECTOR},0)
 PLAT_BL_COMMON_SOURCES	+=	plat/arm/board/fvp/fvp_stack_protector.c
-endif
-
-ifeq (${ARCH},aarch32)
-    NEED_BL32 := yes
 endif
 
 # Enable the dynamic translation tables library.
@@ -513,19 +525,25 @@ endif
 # Test specific macros, keep them at bottom of this file
 $(eval $(call add_define,PLATFORM_TEST_EA_FFH))
 ifeq (${PLATFORM_TEST_EA_FFH}, 1)
-    ifeq (${HANDLE_EA_EL3_FIRST_NS}, 0)
-         $(error "PLATFORM_TEST_EA_FFH expects HANDLE_EA_EL3_FIRST_NS to be 1")
+    ifeq (${FFH_SUPPORT}, 0)
+         $(error "PLATFORM_TEST_EA_FFH expects FFH_SUPPORT to be 1")
     endif
-BL31_SOURCES	+= plat/arm/board/fvp/aarch64/fvp_ea.c
+
 endif
 
 $(eval $(call add_define,PLATFORM_TEST_RAS_FFH))
 ifeq (${PLATFORM_TEST_RAS_FFH}, 1)
-    ifeq (${RAS_EXTENSION}, 0)
-         $(error "PLATFORM_TEST_RAS_FFH expects RAS_EXTENSION to be 1")
+    ifeq (${ENABLE_FEAT_RAS}, 0)
+         $(error "PLATFORM_TEST_RAS_FFH expects ENABLE_FEAT_RAS to be 1")
+    endif
+    ifeq (${HANDLE_EA_EL3_FIRST_NS}, 0)
+         $(error "PLATFORM_TEST_RAS_FFH expects HANDLE_EA_EL3_FIRST_NS to be 1")
     endif
 endif
 
 ifeq (${ERRATA_ABI_SUPPORT}, 1)
 include plat/arm/board/fvp/fvp_cpu_errata.mk
 endif
+
+# Build macro necessary for running SPM tests on FVP platform
+$(eval $(call add_define,PLAT_TEST_SPM))

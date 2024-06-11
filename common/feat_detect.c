@@ -144,6 +144,14 @@ void detect_arch_features(void)
 	check_feature(ENABLE_FEAT_SB, read_feat_sb_id_field(), "SB", 1, 1);
 	check_feature(ENABLE_FEAT_CSV2_2, read_feat_csv2_id_field(),
 		      "CSV2_2", 2, 3);
+	/*
+	 * Even though the PMUv3 is an OPTIONAL feature, it is always
+	 * implemented and Arm prescribes so. So assume it will be there and do
+	 * away with a flag for it. This is used to check minor PMUv3px
+	 * revisions so that we catch them as they come along
+	 */
+	check_feature(FEAT_STATE_ALWAYS, read_feat_pmuv3_id_field(),
+		      "PMUv3", 1, ID_AA64DFR0_PMUVER_PMUV3P7);
 
 	/* v8.1 features */
 	check_feature(ENABLE_FEAT_PAN, read_feat_pan_id_field(), "PAN", 1, 3);
@@ -161,7 +169,7 @@ void detect_arch_features(void)
 	check_feature(ENABLE_FEAT_DIT, read_feat_dit_id_field(), "DIT", 1, 1);
 	check_feature(ENABLE_FEAT_AMU, read_feat_amu_id_field(),
 		      "AMUv1", 1, 2);
-	check_feature(ENABLE_MPAM_FOR_LOWER_ELS, read_feat_mpam_version(),
+	check_feature(ENABLE_FEAT_MPAM, read_feat_mpam_version(),
 		      "MPAM", 1, 17);
 	check_feature(CTX_INCLUDE_NEVE_REGS, read_feat_nv_id_field(),
 		      "NV2", 2, 2);
@@ -184,11 +192,18 @@ void detect_arch_features(void)
 	check_feature(ENABLE_FEAT_TWED, read_feat_twed_id_field(),
 		      "TWED", 1, 1);
 
+	/*
+	 * even though this is a "DISABLE" it does confusingly perform feature
+	 * enablement duties like all other flags here. Check it against the HW
+	 * feature when we intend to diverge from the default behaviour
+	 */
+	check_feature(DISABLE_MTPMU, read_feat_mtpmu_id_field(), "MTPMU", 1, 1);
+
 	/* v8.7 features */
 	check_feature(ENABLE_FEAT_HCX, read_feat_hcx_id_field(), "HCX", 1, 1);
 
 	/* v8.9 features */
-	check_feature(ENABLE_FEAT_TCR2, read_feat_tcrx_id_field(),
+	check_feature(ENABLE_FEAT_TCR2, read_feat_tcr2_id_field(),
 		      "TCR2", 1, 1);
 	check_feature(ENABLE_FEAT_S2PIE, read_feat_s2pie_id_field(),
 		      "S2PIE", 1, 1);
@@ -198,6 +213,8 @@ void detect_arch_features(void)
 		      "S2POE", 1, 1);
 	check_feature(ENABLE_FEAT_S1POE, read_feat_s1poe_id_field(),
 		      "S1POE", 1, 1);
+	check_feature(ENABLE_FEAT_MTE_PERM, read_feat_mte_perm_id_field(),
+		      "MTE_PERM", 1, 1);
 
 	/* v9.0 features */
 	check_feature(ENABLE_BRBE_FOR_NS, read_feat_brbe_id_field(),

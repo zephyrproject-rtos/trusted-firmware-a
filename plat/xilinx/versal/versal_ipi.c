@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2019-2021, Xilinx, Inc. All rights reserved.
+ * Copyright (c) 2019-2022, Xilinx, Inc. All rights reserved.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -8,15 +9,10 @@
  * Versal IPI agent registers access management
  */
 
-#include <errno.h>
+#include <lib/utils_def.h>
+
 #include <ipi.h>
 #include <plat_ipi.h>
-#include <plat_private.h>
-#include <string.h>
-#include <common/debug.h>
-#include <common/runtime_svc.h>
-#include <lib/bakery_lock.h>
-#include <lib/mmio.h>
 
 /* versal ipi configuration table */
 static const struct ipi_config versal_ipi_table[] = {
@@ -24,7 +20,7 @@ static const struct ipi_config versal_ipi_table[] = {
 	[IPI_ID_PMC] = {
 		.ipi_bit_mask = PMC_IPI_TRIG_BIT,
 		.ipi_reg_base = PMC_REG_BASE,
-		.secure_only = 0U,
+		.secure_only = IPI_SECURE_MASK,
 	},
 
 	/* A72 IPI */
@@ -70,10 +66,9 @@ static const struct ipi_config versal_ipi_table[] = {
 	},
 };
 
-/* versal_ipi_config_table_init() - Initialize versal IPI configuration data
- *
- * @ipi_config_table  - IPI configuration table
- * @ipi_total - Total number of IPI available
+/* versal_ipi_config_table_init() - Initialize versal IPI configuration data.
+ * @ipi_config_table: IPI configuration table.
+ * @ipi_total: Total number of IPI available.
  *
  */
 void versal_ipi_config_table_init(void)

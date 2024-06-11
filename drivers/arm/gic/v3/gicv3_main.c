@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2022, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2015-2023, Arm Limited and Contributors. All rights reserved.
  * Copyright (c) 2023, NVIDIA Corporation. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
@@ -421,16 +421,15 @@ unsigned int gicv3_get_pending_interrupt_type(void)
 }
 
 /*******************************************************************************
- * This function returns the type of the interrupt id depending upon the group
- * this interrupt has been configured under by the interrupt controller i.e.
- * group0 or group1 Secure / Non Secure. The return value can be one of the
- * following :
+ * This function returns the group that has been configured under by the
+ * interrupt controller for the given interrupt id i.e. either group0 or group1
+ * Secure / Non Secure. The return value can be one of the following :
  *    INTR_GROUP0  : The interrupt type is a Secure Group 0 interrupt
  *    INTR_GROUP1S : The interrupt type is a Secure Group 1 secure interrupt
  *    INTR_GROUP1NS: The interrupt type is a Secure Group 1 non secure
  *                   interrupt.
  ******************************************************************************/
-unsigned int gicv3_get_interrupt_type(unsigned int id, unsigned int proc_num)
+unsigned int gicv3_get_interrupt_group(unsigned int id, unsigned int proc_num)
 {
 	unsigned int igroup, grpmodr;
 	uintptr_t gicr_base;
@@ -1059,8 +1058,8 @@ void gicv3_set_interrupt_priority(unsigned int id, unsigned int proc_num,
  * is used if the interrupt is SGI or (E)PPI, and programs the corresponding
  * Redistributor interface. The group can be any of GICV3_INTR_GROUP*
  ******************************************************************************/
-void gicv3_set_interrupt_type(unsigned int id, unsigned int proc_num,
-		unsigned int type)
+void gicv3_set_interrupt_group(unsigned int id, unsigned int proc_num,
+		unsigned int group)
 {
 	bool igroup = false, grpmod = false;
 	uintptr_t gicr_base;
@@ -1071,7 +1070,7 @@ void gicv3_set_interrupt_type(unsigned int id, unsigned int proc_num,
 	assert(proc_num < gicv3_driver_data->rdistif_num);
 	assert(gicv3_driver_data->rdistif_base_addrs != NULL);
 
-	switch (type) {
+	switch (group) {
 	case INTR_GROUP1S:
 		igroup = false;
 		grpmod = true;
@@ -1294,6 +1293,31 @@ unsigned int gicv3_set_pmr(unsigned int mask)
 	 */
 	dsbishst();
 	write_icc_pmr_el1(mask);
+
+	return old_mask;
+}
+
+/*******************************************************************************
+ * This function restores the PMR register to old value and also triggers
+ * gicv3_apply_errata_wa_2384374() that flushes the GIC buffer allowing any
+ * pending interrupts to processed. Returns the original PMR.
+ ******************************************************************************/
+unsigned int gicv3_deactivate_priority(unsigned int mask)
+{
+
+	unsigned int old_mask, proc_num;
+	uintptr_t gicr_base;
+
+	old_mask = gicv3_set_pmr(mask);
+
+	proc_num = plat_my_core_pos();
+	gicr_base = gicv3_driver_data->rdistif_base_addrs[proc_num];
+	assert(gicr_base != 0UL);
+
+	/* Add DSB to ensure visibility of System register writes */
+	dsb();
+
+	gicv3_apply_errata_wa_2384374(gicr_base);
 
 	return old_mask;
 }

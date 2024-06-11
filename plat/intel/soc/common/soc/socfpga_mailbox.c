@@ -7,8 +7,10 @@
 #include <lib/mmio.h>
 #include <common/debug.h>
 #include <drivers/delay_timer.h>
+#include <platform_def.h>
 
 #include "socfpga_mailbox.h"
+#include "socfpga_plat_def.h"
 #include "socfpga_sip_svc.h"
 #include "socfpga_system_manager.h"
 
@@ -183,6 +185,7 @@ int mailbox_read_response_async(unsigned int *job_id, uint32_t *header,
 	uint32_t resp_data;
 	uint32_t ret_resp_len = 0;
 	uint8_t is_done = 0;
+	uint32_t resp_len_check = 0;
 
 	if ((mailbox_resp_ctr.flag & MBOX_PAYLOAD_FLAG_BUSY) != 0) {
 		ret_resp_len = MBOX_RESP_LEN(
@@ -240,6 +243,12 @@ int mailbox_read_response_async(unsigned int *job_id, uint32_t *header,
 		if ((ret_resp_len > 0) && (response != NULL) && (resp_len != NULL)) {
 			if (*resp_len > ret_resp_len) {
 				*resp_len = ret_resp_len;
+			}
+
+			resp_len_check = (uint32_t) *resp_len;
+
+			if (resp_len_check > MBOX_DATA_MAX_LEN) {
+				return MBOX_RET_ERROR;
 			}
 
 			memcpy((uint8_t *) response,
@@ -514,8 +523,18 @@ void mailbox_hps_qspi_enable(void)
 void mailbox_reset_cold(void)
 {
 	mailbox_set_int(MBOX_INT_FLAG_COE | MBOX_INT_FLAG_RIE);
-	mailbox_send_cmd(MBOX_JOB_ID, MBOX_CMD_REBOOT_HPS, NULL, 0U,
-				CMD_CASUAL, NULL, NULL);
+
+	mailbox_send_cmd(MBOX_JOB_ID, MBOX_CMD_REBOOT_HPS, 0U, 0U,
+				 CMD_CASUAL, NULL, NULL);
+}
+
+void mailbox_reset_warm(uint32_t reset_type)
+{
+	mailbox_set_int(MBOX_INT_FLAG_COE | MBOX_INT_FLAG_RIE);
+
+	reset_type = 0x01; // Warm reset header data must be 1
+	mailbox_send_cmd(MBOX_JOB_ID, MBOX_CMD_REBOOT_HPS, &reset_type, 1U,
+				 CMD_CASUAL, NULL, NULL);
 }
 
 int mailbox_rsu_get_spt_offset(uint32_t *resp_buf, unsigned int resp_buf_len)
@@ -668,4 +687,12 @@ int mailbox_hwmon_readvolt(uint32_t chan, uint32_t *resp_buf)
 	return mailbox_send_cmd(MBOX_JOB_ID, MBOX_HWMON_READVOLT, &chan, 1U,
 				CMD_CASUAL, resp_buf,
 				&resp_len);
+}
+
+int mailbox_seu_err_status(uint32_t *resp_buf, unsigned int resp_buf_len)
+{
+
+	return mailbox_send_cmd(MBOX_JOB_ID, MBOX_CMD_SEU_ERR_READ, NULL, 0U,
+				CMD_CASUAL, resp_buf,
+				&resp_buf_len);
 }

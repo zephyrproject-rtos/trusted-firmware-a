@@ -62,7 +62,7 @@ STM32_HEADER_VERSION_MAJOR:=	1
 STM32_HEADER_VERSION_MINOR:=	0
 
 # Add OP-TEE reserved shared memory area in mapping
-STM32MP15_OPTEE_RSV_SHM	:=	1
+STM32MP15_OPTEE_RSV_SHM	:=	0
 $(eval $(call add_defines,STM32MP15_OPTEE_RSV_SHM))
 
 STM32MP_CRYPTO_ROM_LIB :=	1
@@ -276,8 +276,6 @@ endif
 
 BL2_SOURCES		+=	drivers/st/ddr/stm32mp1_ddr.c				\
 				drivers/st/ddr/stm32mp1_ram.c
-
-BL2_SOURCES		+=	plat/st/stm32mp1/plat_image_load.c
 
 ifeq ($(AARCH32_SP),sp_min)
 # Create DTB file for BL32

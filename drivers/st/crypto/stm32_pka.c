@@ -33,10 +33,10 @@
 
 #define UINT8_LEN			8U
 #define UINT64_LEN			(UINT8_LEN * sizeof(uint64_t))
-#define WORD_SIZE			(sizeof(uint64_t))
+#define PKA_WORD_SIZE			(sizeof(uint64_t))
 #define OP_NBW_FROM_LEN(len)		(DIV_ROUND_UP_2EVAL((len), UINT64_LEN) + 1)
 #define OP_NBW_FROM_SIZE(s)		OP_NBW_FROM_LEN((s) * UINT8_LEN)
-#define OP_SIZE_FROM_SIZE(s)		(OP_NBW_FROM_SIZE(s) * WORD_SIZE)
+#define OP_SIZE_FROM_SIZE(s)		(OP_NBW_FROM_SIZE(s) * PKA_WORD_SIZE)
 
 #define DT_PKA_COMPAT			"st,stm32-pka64"
 
@@ -56,7 +56,7 @@
 #define _PKA_IPIDR			0x1FF8U
 
 /* PKA control register fields */
-#define _PKA_CR_MODE_MASK		GENMASK(13, 8)
+#define _PKA_CR_MODE_MASK		GENMASK_32(13, 8)
 #define _PKA_CR_MODE_SHIFT		8U
 #define _PKA_CR_MODE_ADD		0x9U
 #define _PKA_CR_MODE_ECDSA_VERIF	0x26U
@@ -69,7 +69,7 @@
 #define _PKA_SR_INITOK			BIT(0)
 
 /* PKA it flag fields (used in CR, SR and CLRFR) */
-#define _PKA_IT_MASK			(GENMASK(21, 19) | BIT(17))
+#define _PKA_IT_MASK			(GENMASK_32(21, 19) | BIT(17))
 #define _PKA_IT_SHIFT			17U
 #define _PKA_IT_OPERR			BIT(21)
 #define _PKA_IT_ADDRERR			BIT(20)
@@ -77,9 +77,9 @@
 #define _PKA_IT_PROCEND			BIT(17)
 
 /* PKA version register fields */
-#define _PKA_VERR_MAJREV_MASK		GENMASK(7, 4)
+#define _PKA_VERR_MAJREV_MASK		GENMASK_32(7, 4)
 #define _PKA_VERR_MAJREV_SHIFT		4U
-#define _PKA_VERR_MINREV_MASK		GENMASK(3, 0)
+#define _PKA_VERR_MINREV_MASK		GENMASK_32(3, 0)
 #define _PKA_VERR_MINREV_SHIFT		0U
 
 /* RAM magic offset */

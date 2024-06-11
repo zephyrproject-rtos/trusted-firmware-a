@@ -27,7 +27,6 @@ include lib/extensions/amu/amu.mk
 include lib/mpmm/mpmm.mk
 
 ifeq (${SPMC_AT_EL3},1)
-  $(warning "EL3 SPMC is an experimental feature")
   $(info Including EL3 SPMC makefile)
   include services/std_svc/spm/common/spm.mk
   include services/std_svc/spm/el3_spmc/spmc.mk
@@ -39,7 +38,6 @@ BL31_SOURCES		+=	bl31/bl31_main.c				\
 				bl31/interrupt_mgmt.c				\
 				bl31/aarch64/bl31_entrypoint.S			\
 				bl31/aarch64/crash_reporting.S			\
-				bl31/aarch64/ea_delegate.S			\
 				bl31/aarch64/runtime_exceptions.S		\
 				bl31/bl31_context_mgmt.c			\
 				bl31/bl31_traps.c				\
@@ -54,10 +52,6 @@ BL31_SOURCES		+=	bl31/bl31_main.c				\
 				${SPMC_SOURCES}					\
 				${SPM_SOURCES}
 
-ifeq (${DISABLE_MTPMU},1)
-BL31_SOURCES		+=	lib/extensions/mtpmu/aarch64/mtpmu.S
-endif
-
 ifeq (${ENABLE_PMF}, 1)
 BL31_SOURCES		+=	lib/pmf/pmf_main.c
 endif
@@ -69,6 +63,10 @@ endif
 
 ifeq (${EL3_EXCEPTION_HANDLING},1)
 BL31_SOURCES		+=	bl31/ehf.c
+endif
+
+ifeq (${FFH_SUPPORT},1)
+BL31_SOURCES		+=	bl31/aarch64/ea_delegate.S
 endif
 
 ifeq (${SDEI_SUPPORT},1)
@@ -110,7 +108,7 @@ ifneq (${ENABLE_SVE_FOR_NS},0)
 BL31_SOURCES		+=	lib/extensions/sve/sve.c
 endif
 
-ifneq (${ENABLE_MPAM_FOR_LOWER_ELS},0)
+ifneq (${ENABLE_FEAT_MPAM},0)
 BL31_SOURCES		+=	lib/extensions/mpam/mpam.c
 endif
 

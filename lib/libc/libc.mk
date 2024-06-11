@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2016-2021, ARM Limited and Contributors. All rights reserved.
+# Copyright (c) 2016-2021, Arm Limited and Contributors. All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
 #
@@ -11,6 +11,7 @@ LIBC_SRCS	:=	$(addprefix lib/libc/,		\
 			memchr.c			\
 			memcmp.c			\
 			memcpy.c			\
+			memcpy_s.c			\
 			memmove.c			\
 			memrchr.c			\
 			memset.c			\

@@ -43,7 +43,7 @@
  */
 #define PLAT_ARM_CLUSTER_COUNT		U(FVP_CLUSTER_COUNT)
 
-#define PLAT_ARM_TRUSTED_SRAM_SIZE	UL(0x00040000)	/* 256 KB */
+#define PLAT_ARM_TRUSTED_SRAM_SIZE	(FVP_TRUSTED_SRAM_SIZE * UL(1024))
 
 #define PLAT_ARM_TRUSTED_ROM_BASE	UL(0x00000000)
 #define PLAT_ARM_TRUSTED_ROM_SIZE	UL(0x04000000)	/* 64 MB */
@@ -128,6 +128,11 @@
  */
 #define PLAT_ARM_NS_IMAGE_BASE		(ARM_DRAM1_BASE + UL(0x8000000))
 
+#if TRANSFER_LIST
+#define FW_HANDOFF_SIZE			0x4000
+#define FW_NS_HANDOFF_BASE		(PLAT_ARM_NS_IMAGE_BASE - FW_HANDOFF_SIZE)
+#endif
+
 /*
  * PLAT_ARM_MMAP_ENTRIES depends on the number of entries in the
  * plat_arm_mmap array defined for each BL stage.
@@ -168,8 +173,13 @@
 #  define MAX_XLAT_TABLES		6
 # endif
 #elif !USE_ROMLIB
-# define PLAT_ARM_MMAP_ENTRIES		11
-# define MAX_XLAT_TABLES		5
+# if ENABLE_RME && defined(IMAGE_BL2)
+#  define PLAT_ARM_MMAP_ENTRIES		12
+#  define MAX_XLAT_TABLES		6
+# else
+#  define PLAT_ARM_MMAP_ENTRIES		11
+#  define MAX_XLAT_TABLES		5
+# endif /* (IMAGE_BL2 && ENABLE_RME) */
 #else
 # define PLAT_ARM_MMAP_ENTRIES		12
 # if (defined(SPD_tspd) || defined(SPD_opteed) || defined(SPD_spmd)) && \
@@ -183,8 +193,10 @@ defined(IMAGE_BL2) && MEASURED_BOOT
 /*
  * PLAT_ARM_MAX_BL1_RW_SIZE is calculated using the current BL1 RW debug size
  * plus a little space for growth.
+ * In case of PSA Crypto API, few algorithms like ECDSA needs bigger BL1 RW
+ * area.
  */
-#if TF_MBEDTLS_KEY_ALG_ID == TF_MBEDTLS_RSA_AND_ECDSA
+#if TF_MBEDTLS_KEY_ALG_ID == TF_MBEDTLS_RSA_AND_ECDSA || PSA_CRYPTO
 #define PLAT_ARM_MAX_BL1_RW_SIZE	UL(0xC000)
 #else
 #define PLAT_ARM_MAX_BL1_RW_SIZE	UL(0xB000)
@@ -205,14 +217,18 @@ defined(IMAGE_BL2) && MEASURED_BOOT
 #endif
 
 /*
- * PLAT_ARM_MAX_BL2_SIZE is calculated using the current BL2 debug size plus a
- * little space for growth.
+ * Set the maximum size of BL2 to be close to half of the Trusted SRAM.
+ * Maximum size of BL2 increases as Trusted SRAM size increases.
  */
 #if CRYPTO_SUPPORT
 #if (TF_MBEDTLS_KEY_ALG_ID == TF_MBEDTLS_RSA_AND_ECDSA) || COT_DESC_IN_DTB
-# define PLAT_ARM_MAX_BL2_SIZE	(UL(0x1E000) - FVP_BL2_ROMLIB_OPTIMIZATION)
+# define PLAT_ARM_MAX_BL2_SIZE	((PLAT_ARM_TRUSTED_SRAM_SIZE / 2) - \
+				 (2 * PAGE_SIZE) - \
+				 FVP_BL2_ROMLIB_OPTIMIZATION)
 #else
-# define PLAT_ARM_MAX_BL2_SIZE	(UL(0x1D000) - FVP_BL2_ROMLIB_OPTIMIZATION)
+# define PLAT_ARM_MAX_BL2_SIZE	((PLAT_ARM_TRUSTED_SRAM_SIZE / 2) - \
+				 (3 * PAGE_SIZE) - \
+				 FVP_BL2_ROMLIB_OPTIMIZATION)
 #endif
 #elif ARM_BL31_IN_DRAM
 /* When ARM_BL31_IN_DRAM is set, BL2 can use almost all of Trusted SRAM. */
@@ -230,9 +246,12 @@ defined(IMAGE_BL2) && MEASURED_BOOT
 /*
  * Since BL31 NOBITS overlays BL2 and BL1-RW, PLAT_ARM_MAX_BL31_SIZE is
  * calculated using the current BL31 PROGBITS debug size plus the sizes of
- * BL2 and BL1-RW
+ * BL2 and BL1-RW.
+ * Size of the BL31 PROGBITS increases as the SRAM size increases.
  */
-#define PLAT_ARM_MAX_BL31_SIZE		(UL(0x3D000) - ARM_L0_GPT_SIZE)
+#define PLAT_ARM_MAX_BL31_SIZE		(PLAT_ARM_TRUSTED_SRAM_SIZE - \
+					 ARM_SHARED_RAM_SIZE - \
+					 ARM_FW_CONFIGS_SIZE - ARM_L0_GPT_SIZE)
 #endif /* RESET_TO_BL31 */
 
 #ifndef __aarch64__
@@ -430,7 +449,12 @@ defined(IMAGE_BL2) && MEASURED_BOOT
 /*
  * Maximum size of Event Log buffer used in Measured Boot Event Log driver
  */
+#if ENABLE_RME && (defined(SPD_tspd) || defined(SPD_opteed) || defined(SPD_spmd))
+/* Account for additional measurements of secure partitions and SPM. */
+#define	PLAT_ARM_EVENT_LOG_MAX_SIZE		UL(0x800)
+#else
 #define	PLAT_ARM_EVENT_LOG_MAX_SIZE		UL(0x400)
+#endif
 
 /*
  * Maximum size of Event Log buffer used for DRTM

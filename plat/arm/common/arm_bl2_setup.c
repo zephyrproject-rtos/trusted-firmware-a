@@ -69,6 +69,8 @@ CASSERT(BL2_BASE >= ARM_FW_CONFIG_LIMIT, assert_bl2_base_overflows);
 void arm_bl2_early_platform_setup(uintptr_t fw_config,
 				  struct meminfo *mem_layout)
 {
+	int __maybe_unused ret;
+
 	/* Initialize the console to provide early debug support */
 	arm_console_boot_init();
 
@@ -82,9 +84,13 @@ void arm_bl2_early_platform_setup(uintptr_t fw_config,
 
 	/* Load partition table */
 #if ARM_GPT_SUPPORT
-	partition_init(GPT_IMAGE_ID);
-#endif /* ARM_GPT_SUPPORT */
+	ret = gpt_partition_init();
+	if (ret != 0) {
+		ERROR("GPT partition initialisation failed!\n");
+		panic();
+	}
 
+#endif /* ARM_GPT_SUPPORT */
 }
 
 void bl2_early_platform_setup2(u_register_t arg0, u_register_t arg1, u_register_t arg2, u_register_t arg3)
@@ -178,11 +184,8 @@ static void arm_bl2_plat_gpt_setup(void)
  ******************************************************************************/
 void arm_bl2_plat_arch_setup(void)
 {
-#if USE_COHERENT_MEM && !ARM_CRYPTOCELL_INTEG
-	/*
-	 * Ensure ARM platforms don't use coherent memory in BL2 unless
-	 * cryptocell integration is enabled.
-	 */
+#if USE_COHERENT_MEM
+	/* Ensure ARM platforms don't use coherent memory in BL2. */
 	assert((BL_COHERENT_RAM_END - BL_COHERENT_RAM_BASE) == 0U);
 #endif
 
@@ -192,9 +195,6 @@ void arm_bl2_plat_arch_setup(void)
 #if USE_ROMLIB
 		ARM_MAP_ROMLIB_CODE,
 		ARM_MAP_ROMLIB_DATA,
-#endif
-#if ARM_CRYPTOCELL_INTEG
-		ARM_MAP_BL_COHERENT_RAM,
 #endif
 		ARM_MAP_BL_CONFIG_REGION,
 #if ENABLE_RME
@@ -311,9 +311,4 @@ int arm_bl2_plat_handle_post_image_load(unsigned int image_id)
 	}
 #endif
 	return arm_bl2_handle_post_image_load(image_id);
-}
-
-int bl2_plat_handle_post_image_load(unsigned int image_id)
-{
-	return arm_bl2_plat_handle_post_image_load(image_id);
 }

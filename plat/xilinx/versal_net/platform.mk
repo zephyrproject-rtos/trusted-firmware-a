@@ -17,6 +17,7 @@ PSCI_EXTENDED_STATE_ID := 1
 SEPARATE_CODE_AND_RODATA := 1
 override RESET_TO_BL31 := 1
 PL011_GENERIC_UART := 1
+IPI_CRC_CHECK := 0
 GIC_ENABLE_V4_EXTN :=  0
 GICV3_SUPPORT_GIC600 := 1
 TFA_NO_PM := 0
@@ -49,6 +50,10 @@ ifdef VERSAL_NET_BL32_MEM_BASE
     $(eval $(call add_define,VERSAL_NET_BL32_MEM_SIZE))
 endif
 
+ifdef IPI_CRC_CHECK
+    $(eval $(call add_define,IPI_CRC_CHECK))
+endif
+
 USE_COHERENT_MEM := 0
 HW_ASSISTED_COHERENCY := 1
 
@@ -59,6 +64,13 @@ else
 endif
 
 $(eval $(call add_define_val,VERSAL_NET_CONSOLE,VERSAL_NET_CONSOLE_ID_${VERSAL_NET_CONSOLE}))
+
+ifdef XILINX_OF_BOARD_DTB_ADDR
+$(eval $(call add_define,XILINX_OF_BOARD_DTB_ADDR))
+endif
+
+# enable assert() for release/debug builds
+ENABLE_ASSERTIONS := 1
 
 PLAT_INCLUDES		:=	-Iinclude/plat/arm/common/			\
 				-Iplat/xilinx/common/include/			\
@@ -77,6 +89,7 @@ PLAT_BL_COMMON_SOURCES	:=	\
 				drivers/delay_timer/generic_delay_timer.c	\
 				${GICV3_SOURCES}				\
 				drivers/arm/pl011/aarch64/pl011_console.S	\
+				plat/common/aarch64/crash_console_helpers.S	\
 				plat/arm/common/arm_common.c			\
 				plat/common/plat_gicv3.c			\
 				${PLAT_PATH}/aarch64/versal_net_helpers.S	\
@@ -96,12 +109,16 @@ BL31_SOURCES		+=	plat/xilinx/common/pm_service/pm_api_sys.c	\
 else
 BL31_SOURCES		+=	${PLAT_PATH}/plat_psci.c
 endif
-BL31_SOURCES		+=	plat/xilinx/common/plat_startup.c		\
+BL31_SOURCES		+=	plat/xilinx/common/plat_fdt.c			\
+				plat/xilinx/common/plat_startup.c		\
+				plat/xilinx/common/plat_console.c		\
 				plat/xilinx/common/ipi.c			\
 				plat/xilinx/common/ipi_mailbox_service/ipi_mailbox_svc.c \
+				plat/xilinx/common/versal.c			\
 				${PLAT_PATH}/bl31_versal_net_setup.c		\
 				${PLAT_PATH}/plat_topology.c			\
 				common/fdt_fixup.c				\
+				common/fdt_wrappers.c				\
 				${LIBFDT_SRCS}					\
 				${PLAT_PATH}/sip_svc_setup.c			\
 				${PLAT_PATH}/versal_net_gicv3.c			\

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2022, Arm Limited. All rights reserved.
+ * Copyright (c) 2021-2023, Arm Limited. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -22,6 +22,70 @@
 #error "Neoverse V2 supports only AArch64. Compile with CTX_INCLUDE_AARCH32_REGS=0"
 #endif
 
+workaround_reset_start neoverse_v2, ERRATUM(2331132), ERRATA_V2_2331132
+	sysreg_bitfield_insert NEOVERSE_V2_CPUECTLR2_EL1, NEOVERSE_V2_CPUECTLR2_EL1_PF_MODE_CNSRV, \
+		NEOVERSE_V2_CPUECTLR2_EL1_PF_MODE_LSB, NEOVERSE_V2_CPUECTLR2_EL1_PF_MODE_WIDTH
+workaround_reset_end neoverse_v2, ERRATUM(2331132)
+
+check_erratum_ls neoverse_v2, ERRATUM(2331132), CPU_REV(0, 2)
+
+workaround_reset_start neoverse_v2, ERRATUM(2618597), ERRATA_V2_2618597
+        /* Disable retention control for WFI and WFE. */
+        mrs     x0, NEOVERSE_V2_CPUPWRCTLR_EL1
+        bfi     x0, xzr, #NEOVERSE_V2_CPUPWRCTLR_EL1_WFI_RET_CTRL_SHIFT, \
+		#NEOVERSE_V2_CPUPWRCTLR_EL1_WFI_RET_CTRL_WIDTH
+        bfi     x0, xzr, #NEOVERSE_V2_CPUPWRCTLR_EL1_WFE_RET_CTRL_SHIFT, \
+		#NEOVERSE_V2_CPUPWRCTLR_EL1_WFE_RET_CTRL_WIDTH
+        msr     NEOVERSE_V2_CPUPWRCTLR_EL1, x0
+workaround_reset_end neoverse_v2, ERRATUM(2618597)
+
+check_erratum_ls neoverse_v2, ERRATUM(2618597), CPU_REV(0, 1)
+
+workaround_reset_start neoverse_v2, ERRATUM(2662553), ERRATA_V2_2662553
+	sysreg_bitfield_insert NEOVERSE_V2_CPUECTLR2_EL1, NEOVERSE_V2_CPUECTLR2_EL1_TXREQ_STATIC_FULL, \
+		NEOVERSE_V2_CPUECTLR2_EL1_TXREQ_LSB, NEOVERSE_V2_CPUECTLR2_EL1_TXREQ_WIDTH
+workaround_reset_end neoverse_v2, ERRATUM(2662553)
+
+check_erratum_ls neoverse_v2, ERRATUM(2662553), CPU_REV(0, 1)
+
+workaround_reset_start neoverse_v2, ERRATUM(2719105), ERRATA_V2_2719105
+	sysreg_bit_set NEOVERSE_V2_CPUACTLR2_EL1, NEOVERSE_V2_CPUACTLR2_EL1_BIT_0
+workaround_reset_end neoverse_v2, ERRATUM(2719105)
+
+check_erratum_ls neoverse_v2, ERRATUM(2719105), CPU_REV(0, 1)
+
+workaround_reset_start neoverse_v2, ERRATUM(2743011), ERRATA_V2_2743011
+	sysreg_bit_set NEOVERSE_V2_CPUACTLR5_EL1, NEOVERSE_V2_CPUACTLR5_EL1_BIT_55
+	sysreg_bit_clear NEOVERSE_V2_CPUACTLR5_EL1, NEOVERSE_V2_CPUACTLR5_EL1_BIT_56
+workaround_reset_end neoverse_v2, ERRATUM(2743011)
+
+check_erratum_ls neoverse_v2, ERRATUM(2743011), CPU_REV(0, 1)
+
+workaround_reset_start neoverse_v2, ERRATUM(2779510), ERRATA_V2_2779510
+	sysreg_bit_set NEOVERSE_V2_CPUACTLR3_EL1, NEOVERSE_V2_CPUACTLR3_EL1_BIT_47
+workaround_reset_end neoverse_v2, ERRATUM(2779510)
+
+check_erratum_ls neoverse_v2, ERRATUM(2779510), CPU_REV(0, 1)
+
+workaround_runtime_start neoverse_v2, ERRATUM(2801372), ERRATA_V2_2801372
+	/* dsb before isb of power down sequence */
+	dsb	sy
+workaround_runtime_end neoverse_v2, ERRATUM(2801372), ERRATA_V2_2801372
+
+check_erratum_ls neoverse_v2, ERRATUM(2801372), CPU_REV(0, 1)
+
+workaround_reset_start neoverse_v2, CVE(2022,23960), WORKAROUND_CVE_2022_23960
+#if IMAGE_BL31
+	/*
+	 * The Neoverse-V2 generic vectors are overridden to apply errata
+         * mitigation on exception entry from lower ELs.
+	 */
+	override_vector_table wa_cve_vbar_neoverse_v2
+#endif /* IMAGE_BL31 */
+workaround_reset_end neoverse_v2, CVE(2022,23960)
+
+check_erratum_chosen neoverse_v2, CVE(2022, 23960), WORKAROUND_CVE_2022_23960
+
 #if WORKAROUND_CVE_2022_23960
 	wa_cve_2022_23960_bhb_vector_table NEOVERSE_V2_BHB_LOOP_COUNT, neoverse_v2
 #endif /* WORKAROUND_CVE_2022_23960 */
@@ -35,59 +99,19 @@ func neoverse_v2_core_pwr_dwn
 	 * Enable CPU power down bit in power control register
 	 * ---------------------------------------------------
 	 */
-	mrs	x0, NEOVERSE_V2_CPUPWRCTLR_EL1
-	orr	x0, x0, #NEOVERSE_V2_CPUPWRCTLR_EL1_CORE_PWRDN_BIT
-	msr	NEOVERSE_V2_CPUPWRCTLR_EL1, x0
+	sysreg_bit_set NEOVERSE_V2_CPUPWRCTLR_EL1, NEOVERSE_V2_CPUPWRCTLR_EL1_CORE_PWRDN_BIT
+	apply_erratum neoverse_v2, ERRATUM(2801372), ERRATA_V2_2801372
+
 	isb
 	ret
 endfunc neoverse_v2_core_pwr_dwn
 
-func check_errata_cve_2022_23960
-#if WORKAROUND_CVE_2022_23960
-	mov	x0, #ERRATA_APPLIES
-#else
-	mov	x0, #ERRATA_MISSING
-#endif
-	ret
-endfunc check_errata_cve_2022_23960
-
-func neoverse_v2_reset_func
+cpu_reset_func_start neoverse_v2
 	/* Disable speculative loads */
 	msr	SSBS, xzr
+cpu_reset_func_end neoverse_v2
 
-#if IMAGE_BL31 && WORKAROUND_CVE_2022_23960
-	/*
-	 * The Neoverse V2 vectors are overridden to apply
-	 * errata mitigation on exception entry from lower ELs.
-	 */
-	adr	x0, wa_cve_vbar_neoverse_v2
-	msr	vbar_el3, x0
-#endif /* IMAGE_BL31 && WORKAROUND_CVE_2022_23960 */
-	isb
-	ret
-endfunc neoverse_v2_reset_func
-
-#if REPORT_ERRATA
-/*
- * Errata printing function for Neoverse V2. Must follow AAPCS.
- */
-func neoverse_v2_errata_report
-	stp	x8, x30, [sp, #-16]!
-
-	bl	cpu_get_rev_var
-	mov	x8, x0
-
-	/*
-	 * Report all errata. The revision-variant information is passed to
-	 * checking functions of each errata.
-	 */
-	report_errata WORKAROUND_CVE_2022_23960, neoverse_v2, cve_2022_23960
-
-	ldp	x8, x30, [sp], #16
-	ret
-endfunc neoverse_v2_errata_report
-#endif
-
+errata_report_shim neoverse_v2
 	/* ---------------------------------------------
 	 * This function provides Neoverse V2-
 	 * specific register information for crash

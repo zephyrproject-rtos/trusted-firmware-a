@@ -219,6 +219,19 @@ int psci_cpu_suspend_start(const entry_point_info_t *ep,
 	}
 #endif
 
+#if PSCI_OS_INIT_MODE
+	if (psci_plat_pm_ops->pwr_domain_validate_suspend != NULL) {
+		rc = psci_plat_pm_ops->pwr_domain_validate_suspend(state_info);
+		if (rc != PSCI_E_SUCCESS) {
+			skip_wfi = true;
+			goto exit;
+		}
+	}
+#endif
+
+	/* Update the target state in the power domain nodes */
+	psci_set_target_local_pwr_states(end_pwrlvl, state_info);
+
 #if ENABLE_PSCI_STAT
 	/* Update the last cpu for each level till end_pwrlvl */
 	psci_stats_update_pwr_down(end_pwrlvl, state_info);
@@ -234,15 +247,7 @@ int psci_cpu_suspend_start(const entry_point_info_t *ep,
 	 * program the power controller etc.
 	 */
 
-#if PSCI_OS_INIT_MODE
-	rc = psci_plat_pm_ops->pwr_domain_suspend(state_info);
-	if (rc != PSCI_E_SUCCESS) {
-		skip_wfi = true;
-		goto exit;
-	}
-#else
 	psci_plat_pm_ops->pwr_domain_suspend(state_info);
-#endif
 
 #if ENABLE_PSCI_STAT
 	plat_psci_stat_accounting_start(state_info);
@@ -362,11 +367,4 @@ void psci_cpu_suspend_finish(unsigned int cpu_idx, const psci_power_state_t *sta
 	psci_set_suspend_pwrlvl(PSCI_INVALID_PWR_LVL);
 
 	PUBLISH_EVENT(psci_suspend_pwrdown_finish);
-
-	/*
-	 * Generic management: Now we just need to retrieve the
-	 * information that we had stashed away during the suspend
-	 * call to set this cpu on its way.
-	 */
-	cm_prepare_el3_exit_ns();
 }

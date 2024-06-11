@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2021-2022, Arm Limited and Contributors. All rights reserved.
  * Copyright (c) 2018-2022, Xilinx, Inc. All rights reserved.
- * Copyright (c) 2022, Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -12,6 +12,7 @@
 #include <lib/mmio.h>
 #include <lib/xlat_tables/xlat_tables_v2.h>
 #include <plat/common/platform.h>
+#include <plat_common.h>
 #include <plat_ipi.h>
 
 #include <plat_private.h>
@@ -33,7 +34,7 @@ const mmap_region_t plat_versal_net_mmap[] = {
 	{ 0 }
 };
 
-const mmap_region_t *plat_versal_net_get_mmap(void)
+const mmap_region_t *plat_get_mmap(void)
 {
 	return plat_versal_net_mmap;
 }
@@ -85,6 +86,30 @@ void board_detection(void)
 	/* Make sure that console is setup to see this message */
 	VERBOSE("Platform id: %d version: %d.%d\n", platform_id,
 	      platform_version / 10U, platform_version % 10U);
+}
+
+uint32_t get_uart_clk(void)
+{
+	uint32_t uart_clock;
+
+	switch (platform_id) {
+	case VERSAL_NET_SPP:
+		uart_clock = 1000000;
+		break;
+	case VERSAL_NET_EMU:
+		uart_clock = 25000000;
+		break;
+	case VERSAL_NET_QEMU:
+		uart_clock = 25000000;
+		break;
+	case VERSAL_NET_SILICON:
+		uart_clock = 100000000;
+		break;
+	default:
+		panic();
+	}
+
+	return uart_clock;
 }
 
 void versal_net_config_setup(void)

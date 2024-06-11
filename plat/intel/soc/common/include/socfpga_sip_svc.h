@@ -15,6 +15,7 @@
 #define INTEL_SIP_SMC_STATUS_NO_RESPONSE			0x3
 #define INTEL_SIP_SMC_STATUS_ERROR				0x4
 #define INTEL_SIP_SMC_RSU_ERROR					0x7
+#define INTEL_SIP_SMC_SEU_ERR_READ_ERROR		0x8
 
 /* SiP mailbox error code */
 #define GENERIC_RESPONSE_ERROR					0x3FF
@@ -138,6 +139,9 @@
 #define INTEL_SIP_SMC_FCS_ECDH_REQUEST_INIT				0xC200008C
 #define INTEL_SIP_SMC_FCS_ECDH_REQUEST_FINALIZE				0xC200008E
 
+/* SEU ERR */
+#define INTEL_SIP_SMC_SEU_ERR_STATUS				0xC2000099
+
 #define INTEL_SIP_SMC_FCS_SHA_MODE_MASK				0xF
 #define INTEL_SIP_SMC_FCS_DIGEST_SIZE_MASK			0xF
 #define INTEL_SIP_SMC_FCS_DIGEST_SIZE_OFFSET			4U
@@ -163,6 +167,7 @@
 #define INTEL_SIP_SMC_V2_REG_WRITE				0xC2000402
 #define INTEL_SIP_SMC_V2_REG_UPDATE				0xC2000403
 #define INTEL_SIP_SMC_V2_HPS_SET_BRIDGES			0xC2000404
+#define INTEL_SIP_SMC_V2_RSU_UPDATE_ADDR			0xC2000405
 
 /* V2: Mailbox function identifier */
 #define INTEL_SIP_SMC_V2_MAILBOX_SEND_COMMAND			0xC2000420
@@ -181,7 +186,7 @@
 /*
  * Increase if there is new SMC function ID being added
  */
-#define SIP_SVC_VERSION_MINOR					1
+#define SIP_SVC_VERSION_MINOR					2
 
 
 /* Structure Definitions */
@@ -214,6 +219,9 @@ uint32_t intel_secure_reg_write(uint64_t reg_addr, uint32_t val,
 				uint32_t *retval);
 uint32_t intel_secure_reg_update(uint64_t reg_addr, uint32_t mask,
 				 uint32_t val, uint32_t *retval);
+
+/* Set RSU update address*/
+uint32_t intel_rsu_update(uint64_t update_address);
 
 /* Miscellaneous HPS services */
 uint32_t intel_hps_set_bridges(uint64_t enable, uint64_t mask);

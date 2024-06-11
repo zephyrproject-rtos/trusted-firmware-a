@@ -59,43 +59,26 @@
 	 * zero here but are updated ahead of transitioning to a lower EL in the
 	 * function cm_init_context_common().
 	 *
-	 * SCR_EL3.TWE: Set to zero so that execution of WFE instructions at
-	 *  EL2, EL1 and EL0 are not trapped to EL3.
-	 *
-	 * SCR_EL3.TWI: Set to zero so that execution of WFI instructions at
-	 *  EL2, EL1 and EL0 are not trapped to EL3.
-	 *
 	 * SCR_EL3.SIF: Set to one to disable instruction fetches from
 	 *  Non-secure memory.
-	 *
-	 * SCR_EL3.SMD: Set to zero to enable SMC calls at EL1 and above, from
-	 *  both Security states and both Execution states.
 	 *
 	 * SCR_EL3.EA: Set to one to route External Aborts and SError Interrupts
 	 *  to EL3 when executing at any EL.
 	 *
-	 * SCR_EL3.{API,APK}: For Armv8.3 pointer authentication feature,
-	 * disable traps to EL3 when accessing key registers or using pointer
-	 * authentication instructions from lower ELs.
+	 * SCR_EL3.EEL2: Set to one if S-EL2 is present and enabled.
+	 *
+	 * NOTE: Modifying EEL2 bit along with EA bit ensures that we mitigate
+	 * against ERRATA_V2_3099206.
 	 * ---------------------------------------------------------------------
 	 */
-	mov_imm	x0, ((SCR_RESET_VAL | SCR_EA_BIT | SCR_SIF_BIT) \
-			& ~(SCR_TWE_BIT | SCR_TWI_BIT | SCR_SMD_BIT))
-#if CTX_INCLUDE_PAUTH_REGS
-	/*
-	 * If the pointer authentication registers are saved during world
-	 * switches, enable pointer authentication everywhere, as it is safe to
-	 * do so.
-	 */
-	orr	x0, x0, #(SCR_API_BIT | SCR_APK_BIT)
+	mov_imm	x0, (SCR_RESET_VAL | SCR_EA_BIT | SCR_SIF_BIT)
+#if IMAGE_BL31 && defined(SPD_spmd) && SPMD_SPM_AT_SEL2
+	mrs x1, id_aa64pfr0_el1
+	and x1, x1, #(ID_AA64PFR0_SEL2_MASK << ID_AA64PFR0_SEL2_SHIFT)
+	cbz x1, 1f
+	orr x0, x0, #SCR_EEL2_BIT
 #endif
-#if ENABLE_RME
-	/*
-	 * TODO: Settting the EEL2 bit to allow EL3 access to secure only registers
-	 * in context management. This will need to be refactored.
-	 */
-	orr	x0, x0, #SCR_EEL2_BIT
-#endif
+1:
 	msr	scr_el3, x0
 
 	/* ---------------------------------------------------------------------
@@ -115,81 +98,12 @@
 	 * MDCR_EL3.TDA: Set to zero to allow EL0, EL1 and EL2 access to the
 	 *  debug registers, other than those registers that are controlled by
 	 *  MDCR_EL3.TDOSA.
-	 *
-	 * MDCR_EL3.TPM: Set to zero so that EL0, EL1, and EL2 System register
-	 *  accesses to all Performance Monitors registers do not trap to EL3.
-	 *
-	 * MDCR_EL3.SCCD: Set to one so that cycle counting by PMCCNTR_EL0 is
-	 *  prohibited in Secure state. This bit is RES0 in versions of the
-	 *  architecture with FEAT_PMUv3p5 not implemented, setting it to 1
-	 *  doesn't have any effect on them.
-	 *
-	 * MDCR_EL3.MCCD: Set to one so that cycle counting by PMCCNTR_EL0 is
-	 *  prohibited in EL3. This bit is RES0 in versions of the
-	 *  architecture with FEAT_PMUv3p7 not implemented, setting it to 1
-	 *  doesn't have any effect on them.
-	 *
-	 * MDCR_EL3.SPME: Set to zero so that event counting by the programmable
-	 *  counters PMEVCNTR<n>_EL0 is prohibited in Secure state. If ARMv8.2
-	 *  Debug is not implemented this bit does not have any effect on the
-	 *  counters unless there is support for the implementation defined
-	 *  authentication interface ExternalSecureNoninvasiveDebugEnabled().
-	 *
-	 * MDCR_EL3.NSTB, MDCR_EL3.NSTBE: Set to zero so that Trace Buffer
-	 *  owning security state is Secure state. If FEAT_TRBE is implemented,
-	 *  accesses to Trace Buffer control registers at EL2 and EL1 in any
-	 *  security state generates trap exceptions to EL3.
-	 *  If FEAT_TRBE is not implemented, these bits are RES0.
-	 *
-	 * MDCR_EL3.TTRF: Set to one so that access to trace filter control
-	 *  registers in non-monitor mode generate EL3 trap exception,
-	 *  unless the access generates a higher priority exception when trace
-	 *  filter control(FEAT_TRF) is implemented.
-	 *  When FEAT_TRF is not implemented, this bit is RES0.
-	 * ---------------------------------------------------------------------
 	 */
 	mov_imm	x0, ((MDCR_EL3_RESET_VAL | MDCR_SDD_BIT | \
-		      MDCR_SPD32(MDCR_SPD32_DISABLE) | MDCR_SCCD_BIT | \
-		      MDCR_MCCD_BIT) & ~(MDCR_SPME_BIT | MDCR_TDOSA_BIT | \
-		      MDCR_TDA_BIT | MDCR_TPM_BIT | MDCR_NSTB(MDCR_NSTB_EL1) | \
-		      MDCR_NSTBE | MDCR_TTRF_BIT))
+		      MDCR_SPD32(MDCR_SPD32_DISABLE)) & \
+		    ~(MDCR_TDOSA_BIT | MDCR_TDA_BIT))
 
-	mrs	x1, id_aa64dfr0_el1
-	ubfx	x1, x1, #ID_AA64DFR0_TRACEFILT_SHIFT, #ID_AA64DFR0_TRACEFILT_LENGTH
-	cbz	x1, 1f
-	orr	x0, x0, #MDCR_TTRF_BIT
-1:
 	msr	mdcr_el3, x0
-
-	/* ---------------------------------------------------------------------
-	 * Initialise PMCR_EL0 setting all fields rather than relying
-	 * on hw. Some fields are architecturally UNKNOWN on reset.
-	 *
-	 * PMCR_EL0.LP: Set to one so that event counter overflow, that
-	 *  is recorded in PMOVSCLR_EL0[0-30], occurs on the increment
-	 *  that changes PMEVCNTR<n>_EL0[63] from 1 to 0, when ARMv8.5-PMU
-	 *  is implemented. This bit is RES0 in versions of the architecture
-	 *  earlier than ARMv8.5, setting it to 1 doesn't have any effect
-	 *  on them.
-	 *
-	 * PMCR_EL0.LC: Set to one so that cycle counter overflow, that
-	 *  is recorded in PMOVSCLR_EL0[31], occurs on the increment
-	 *  that changes PMCCNTR_EL0[63] from 1 to 0.
-	 *
-	 * PMCR_EL0.DP: Set to one so that the cycle counter,
-	 *  PMCCNTR_EL0 does not count when event counting is prohibited.
-	 *
-	 * PMCR_EL0.X: Set to zero to disable export of events.
-	 *
-	 * PMCR_EL0.D: Set to zero so that, when enabled, PMCCNTR_EL0
-	 *  counts on every clock cycle.
-	 * ---------------------------------------------------------------------
-	 */
-	mov_imm	x0, ((PMCR_EL0_RESET_VAL | PMCR_EL0_LP_BIT | \
-		      PMCR_EL0_LC_BIT | PMCR_EL0_DP_BIT) & \
-		    ~(PMCR_EL0_X_BIT | PMCR_EL0_D_BIT))
-
-	msr	pmcr_el0, x0
 
 	/* ---------------------------------------------------------------------
 	 * Enable External Aborts and SError Interrupts now that the exception
@@ -201,39 +115,9 @@
 	/* ---------------------------------------------------------------------
 	 * Initialise CPTR_EL3, setting all fields rather than relying on hw.
 	 * All fields are architecturally UNKNOWN on reset.
-	 *
-	 * CPTR_EL3.TCPAC: Set to zero so that any accesses to CPACR_EL1,
-	 *  CPTR_EL2, CPACR, or HCPTR do not trap to EL3.
-	 *
-	 * CPTR_EL3.TTA: Set to one so that accesses to the trace system
-	 *  registers trap to EL3 from all exception levels and security
-	 *  states when system register trace is implemented.
-	 *  When system register trace is not implemented, this bit is RES0 and
-	 *  hence set to zero.
-	 *
-	 * CPTR_EL3.TTA: Set to zero so that System register accesses to the
-	 *  trace registers do not trap to EL3.
-	 *
-	 * CPTR_EL3.TFP: Set to zero so that accesses to the V- or Z- registers
-	 *  by Advanced SIMD, floating-point or SVE instructions (if implemented)
-	 *  do not trap to EL3.
-	 *
-	 * CPTR_EL3.TAM: Set to one so that Activity Monitor access is
-	 *  trapped to EL3 by default.
-	 *
-	 * CPTR_EL3.EZ: Set to zero so that all SVE functionality is trapped
-	 *  to EL3 by default.
-	 *
-	 * CPTR_EL3.ESM: Set to zero so that all SME functionality is trapped
-	 *  to EL3 by default.
+	 * ---------------------------------------------------------------------
 	 */
-
-	mov_imm x0, (CPTR_EL3_RESET_VAL & ~(TCPAC_BIT | TTA_BIT | TFP_BIT))
-	mrs	x1, id_aa64dfr0_el1
-	ubfx	x1, x1, #ID_AA64DFR0_TRACEVER_SHIFT, #ID_AA64DFR0_TRACEVER_LENGTH
-	cbz	x1, 1f
-	orr	x0, x0, #TTA_BIT
-1:
+	mov_imm x0, CPTR_EL3_RESET_VAL
 	msr	cptr_el3, x0
 
 	/*
@@ -336,13 +220,13 @@
 		 */
 		mov_imm	x0, (SCTLR_RESET_VAL & ~(SCTLR_EE_BIT | SCTLR_WXN_BIT \
 				| SCTLR_SA_BIT | SCTLR_A_BIT | SCTLR_DSSBS_BIT))
+#if ENABLE_FEAT_RAS
+		/* If FEAT_RAS is present assume FEAT_IESB is also present */
+		orr	x0, x0, #SCTLR_IESB_BIT
+#endif
 		msr	sctlr_el3, x0
 		isb
 	.endif /* _init_sctlr */
-
-#if DISABLE_MTPMU
-		bl	mtpmu_disable
-#endif
 
 	.if \_warm_boot_mailbox
 		/* -------------------------------------------------------------
@@ -571,6 +455,22 @@
 	isb
 	msr	tcr_el1, x29
 #endif
+	.endm
+
+/* -----------------------------------------------------------------
+ * The below macro reads SCR_EL3 from the context structure to
+ * determine the security state of the context upon ERET.
+ * ------------------------------------------------------------------
+ */
+	.macro get_security_state _ret:req, _scr_reg:req
+		ubfx 	\_ret, \_scr_reg, #SCR_NSE_SHIFT, #1
+		cmp 	\_ret, #1
+		beq 	realm_state
+		bfi	\_ret, \_scr_reg, #0, #1
+		b 	end
+	realm_state:
+		mov 	\_ret, #2
+	end:
 	.endm
 
 #endif /* EL3_COMMON_MACROS_S */

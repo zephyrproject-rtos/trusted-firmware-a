@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2023, Arm Limited. All rights reserved.
+ * Copyright (c) 2021-2024, Arm Limited. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -84,9 +84,9 @@ module.exports = {
             "filename": "pyproject.toml",
             "updater": {
                 "readVersion": function (contents) {
-                    const _ver = contents.match(/version\s=.*"(\d)\.(\d)\.(\d)/);
+                    const _ver = contents.match(/version\s=.*"(\d+?)\.(\d+?)\.(\d+?)/);
 
-                    return `${_ver[1]}.${_ver[2]}.${_ver[2]}`;
+                    return `${_ver[1]}.${_ver[2]}.${_ver[3]}`;
                 },
 
                 "writeVersion": function (contents, version) {
@@ -94,12 +94,30 @@ module.exports = {
 
                     return contents.replace(/^(version\s=\s")((\d).?)*$/m, _ver)
                 }
-
             },
         },
         {
             "filename": "package-lock.json",
             "type": "json"
+        },
+        {
+            "filename": "docs/conf.py",
+            "updater": {
+                "readVersion": function (contents) {
+                    const _ver = contents.match(/version\s=.*"(\d+?)\.(\d+?)\.(\d+?)/);
+
+                    return `${_ver[1]}.${_ver[2]}.${_ver[3]}`;
+                },
+
+                "writeVersion": function (contents, version) {
+                    const _ver = 'version = "' + version + '"'
+                    const _rel = 'release = "' + version + '"'
+
+                    contents = contents.replace(/^(version\s=\s")((\d).?)*$/m, _ver)
+                    contents = contents.replace(/^(release\s=\s")((\d).?)*$/m, _rel)
+                    return contents
+                }
+            },
         },
         {
             "filename": "tools/conventional-changelog-tf-a/package.json",
@@ -111,16 +129,19 @@ module.exports = {
                 "readVersion": function (contents) {
                     const major = contents.match(/^VERSION_MAJOR\s*:=\s*(\d+?)$/m)[1];
                     const minor = contents.match(/^VERSION_MINOR\s*:=\s*(\d+?)$/m)[1];
+                    const patch = contents.match(/^VERSION_PATCH\s*:=\s*(\d+?)$/m)[1];
 
-                    return `${major}.${minor}.0`;
+                    return `${major}.${minor}.${patch}`;
                 },
 
                 "writeVersion": function (contents, version) {
                     const major = version.split(".")[0];
                     const minor = version.split(".")[1];
+                    const patch = version.split(".")[2];
 
                     contents = contents.replace(/^(VERSION_MAJOR\s*:=\s*)(\d+?)$/m, `$1${major}`);
                     contents = contents.replace(/^(VERSION_MINOR\s*:=\s*)(\d+?)$/m, `$1${minor}`);
+                    contents = contents.replace(/^(VERSION_PATCH\s*:=\s*)(\d+?)$/m, `$1${patch}`);
 
                     return contents;
                 }

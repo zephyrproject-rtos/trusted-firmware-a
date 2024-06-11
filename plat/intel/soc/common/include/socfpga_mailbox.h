@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019-2022, Intel Corporation. All rights reserved.
+ * Copyright (c) 2019-2023, Intel Corporation. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -9,8 +9,11 @@
 
 #include <lib/utils_def.h>
 
-
+#if PLATFORM_MODEL == PLAT_SOCFPGA_AGILEX5
+#define MBOX_OFFSET					0x10a30000
+#else
 #define MBOX_OFFSET					0xffa30000
+#endif
 
 #define MBOX_ATF_CLIENT_ID				0x1U
 #define MBOX_MAX_JOB_ID					0xFU
@@ -62,6 +65,9 @@
 #define MBOX_CMD_QSPI_CLOSE				0x33
 #define MBOX_CMD_QSPI_SET_CS				0x34
 #define MBOX_CMD_QSPI_DIRECT				0x3B
+
+/* SEU Commands */
+#define MBOX_CMD_SEU_ERR_READ				0x3C
 
 /* RSU Commands */
 #define MBOX_GET_SUBPARTITION_TABLE			0x5A
@@ -190,9 +196,9 @@
 #define RSU_VERSION_ACMF_MASK				0xff00
 
 /* Config Status Macros */
-#define CONFIG_STATUS_WORD_SIZE		16U
-#define CONFIG_STATUS_FW_VER_OFFSET	1
-#define CONFIG_STATUS_FW_VER_MASK	0x00FFFFFF
+#define CONFIG_STATUS_WORD_SIZE			16U
+#define CONFIG_STATUS_FW_VER_OFFSET		1
+#define CONFIG_STATUS_FW_VER_MASK		0x00FFFFFF
 
 /* Data structure */
 
@@ -230,6 +236,7 @@ int iterate_resp(uint32_t mbox_resp_len, uint32_t *resp_buf,
 			unsigned int *resp_len);
 
 void mailbox_reset_cold(void);
+void mailbox_reset_warm(uint32_t reset_type);
 void mailbox_clear_response(void);
 
 int intel_mailbox_get_config_status(uint32_t cmd, bool init_done);
@@ -241,5 +248,6 @@ int mailbox_rsu_update(uint32_t *flash_offset);
 int mailbox_hps_stage_notify(uint32_t execution_stage);
 int mailbox_hwmon_readtemp(uint32_t chan, uint32_t *resp_buf);
 int mailbox_hwmon_readvolt(uint32_t chan, uint32_t *resp_buf);
+int mailbox_seu_err_status(uint32_t *resp_buf, uint32_t resp_buf_len);
 
 #endif /* SOCFPGA_MBOX_H */

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2023, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2013-2024, Arm Limited and Contributors. All rights reserved.
  * Copyright (c) 2020-2022, NVIDIA Corporation. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
@@ -157,6 +157,8 @@
 #define DCCSW			U(0x2)
 #endif
 
+#define ID_REG_FIELD_MASK			ULL(0xf)
+
 /* ID_AA64PFR0_EL1 definitions */
 #define ID_AA64PFR0_EL0_SHIFT			U(0)
 #define ID_AA64PFR0_EL1_SHIFT			U(4)
@@ -221,6 +223,12 @@
 #define ID_AA64DFR0_TRACEFILT_MASK	U(0xf)
 #define ID_AA64DFR0_TRACEFILT_SUPPORTED	U(1)
 #define ID_AA64DFR0_TRACEFILT_LENGTH	U(4)
+#define ID_AA64DFR0_PMUVER_LENGTH	U(4)
+#define ID_AA64DFR0_PMUVER_SHIFT	U(8)
+#define ID_AA64DFR0_PMUVER_MASK		U(0xf)
+#define ID_AA64DFR0_PMUVER_PMUV3	U(1)
+#define ID_AA64DFR0_PMUVER_PMUV3P7	U(7)
+#define ID_AA64DFR0_PMUVER_IMP_DEF	U(0xf)
 
 /* ID_AA64DFR0_EL1.PMS definitions (for ARMv8.2+) */
 #define ID_AA64DFR0_PMS_SHIFT		U(32)
@@ -237,6 +245,7 @@
 #define ID_AA64DFR0_MTPMU_SHIFT		U(48)
 #define ID_AA64DFR0_MTPMU_MASK		ULL(0xf)
 #define ID_AA64DFR0_MTPMU_SUPPORTED	ULL(1)
+#define ID_AA64DFR0_MTPMU_DISABLED	ULL(15)
 
 /* ID_AA64DFR0_EL1.BRBE definitions */
 #define ID_AA64DFR0_BRBE_SHIFT		U(52)
@@ -267,6 +276,9 @@
 
 /* ID_AA64ISAR2_EL1 definitions */
 #define ID_AA64ISAR2_EL1		S3_0_C0_C6_2
+
+/* ID_AA64PFR2_EL1 definitions */
+#define ID_AA64PFR2_EL1			S3_0_C0_C4_2
 
 #define ID_AA64ISAR2_GPA3_SHIFT		U(8)
 #define ID_AA64ISAR2_GPA3_MASK		ULL(0xf)
@@ -300,6 +312,7 @@
 #define ID_AA64MMFR0_EL1_TGRAN4_SHIFT		U(28)
 #define ID_AA64MMFR0_EL1_TGRAN4_MASK		ULL(0xf)
 #define ID_AA64MMFR0_EL1_TGRAN4_SUPPORTED	ULL(0x0)
+#define ID_AA64MMFR0_EL1_TGRAN4_52B_SUPPORTED	ULL(0x1)
 #define ID_AA64MMFR0_EL1_TGRAN4_NOT_SUPPORTED	ULL(0xf)
 
 #define ID_AA64MMFR0_EL1_TGRAN64_SHIFT		U(24)
@@ -311,6 +324,7 @@
 #define ID_AA64MMFR0_EL1_TGRAN16_MASK		ULL(0xf)
 #define ID_AA64MMFR0_EL1_TGRAN16_SUPPORTED	ULL(0x1)
 #define ID_AA64MMFR0_EL1_TGRAN16_NOT_SUPPORTED	ULL(0x0)
+#define ID_AA64MMFR0_EL1_TGRAN16_52B_SUPPORTED	ULL(0x2)
 
 /* ID_AA64MMFR1_EL1 definitions */
 #define ID_AA64MMFR1_EL1_TWED_SHIFT		U(32)
@@ -393,6 +407,16 @@
 #define ID_AA64PFR1_EL1_RNG_TRAP_SUPPORTED	ULL(0x1)
 #define ID_AA64PFR1_EL1_RNG_TRAP_NOT_SUPPORTED	ULL(0x0)
 
+/* ID_AA64PFR2_EL1 definitions */
+#define ID_AA64PFR2_EL1_MTEPERM_SHIFT		U(0)
+#define ID_AA64PFR2_EL1_MTEPERM_MASK		ULL(0xf)
+
+#define ID_AA64PFR2_EL1_MTESTOREONLY_SHIFT	U(4)
+#define ID_AA64PFR2_EL1_MTESTOREONLY_MASK	ULL(0xf)
+
+#define ID_AA64PFR2_EL1_MTEFAR_SHIFT		U(8)
+#define ID_AA64PFR2_EL1_MTEFAR_MASK		ULL(0xf)
+
 #define VDISR_EL2				S3_4_C12_C1_1
 #define VSESR_EL2				S3_4_C5_C2_3
 
@@ -413,6 +437,7 @@
 
 #define ID_AA64PFR1_EL1_SME_SHIFT		U(24)
 #define ID_AA64PFR1_EL1_SME_MASK		ULL(0xf)
+#define ID_AA64PFR1_EL1_SME_WIDTH		U(4)
 #define ID_AA64PFR1_EL1_SME_NOT_SUPPORTED	ULL(0x0)
 #define ID_AA64PFR1_EL1_SME_SUPPORTED		ULL(0x1)
 #define ID_AA64PFR1_EL1_SME2_SUPPORTED		ULL(0x2)
@@ -574,7 +599,7 @@
 #define MDCR_SBRBE_MASK		ULL(0x3)
 #define MDCR_NSTB(x)		((x) << 24)
 #define MDCR_NSTB_EL1		ULL(0x3)
-#define MDCR_NSTBE		(ULL(1) << 26)
+#define MDCR_NSTBE_BIT		(ULL(1) << 26)
 #define MDCR_MTPME_BIT		(ULL(1) << 28)
 #define MDCR_TDCC_BIT		(ULL(1) << 27)
 #define MDCR_SCCD_BIT		(ULL(1) << 23)
@@ -590,19 +615,20 @@
 #define MDCR_SPD32_ENABLE	ULL(0x3)
 #define MDCR_NSPB(x)		((x) << 12)
 #define MDCR_NSPB_EL1		ULL(0x3)
+#define MDCR_NSPBE_BIT		(ULL(1) << 11)
 #define MDCR_TDOSA_BIT		(ULL(1) << 10)
 #define MDCR_TDA_BIT		(ULL(1) << 9)
 #define MDCR_TPM_BIT		(ULL(1) << 6)
-#define MDCR_EL3_RESET_VAL	ULL(0x0)
+#define MDCR_EL3_RESET_VAL	MDCR_MTPME_BIT
 
 /* MDCR_EL2 definitions */
 #define MDCR_EL2_MTPME		(U(1) << 28)
-#define MDCR_EL2_HLP		(U(1) << 26)
+#define MDCR_EL2_HLP_BIT	(U(1) << 26)
 #define MDCR_EL2_E2TB(x)	((x) << 24)
 #define MDCR_EL2_E2TB_EL1	U(0x3)
-#define MDCR_EL2_HCCD		(U(1) << 23)
+#define MDCR_EL2_HCCD_BIT	(U(1) << 23)
 #define MDCR_EL2_TTRF		(U(1) << 19)
-#define MDCR_EL2_HPMD		(U(1) << 17)
+#define MDCR_EL2_HPMD_BIT	(U(1) << 17)
 #define MDCR_EL2_TPMS		(U(1) << 14)
 #define MDCR_EL2_E2PB(x)	((x) << 12)
 #define MDCR_EL2_E2PB_EL1	U(0x3)
@@ -613,6 +639,7 @@
 #define MDCR_EL2_HPME_BIT	(U(1) << 7)
 #define MDCR_EL2_TPM_BIT	(U(1) << 6)
 #define MDCR_EL2_TPMCR_BIT	(U(1) << 5)
+#define MDCR_EL2_HPMN_MASK	U(0x1f)
 #define MDCR_EL2_RESET_VAL	U(0x0)
 
 /* HSTR_EL2 definitions */
@@ -935,6 +962,7 @@
 #define EC_AARCH64_HVC			U(0x16)
 #define EC_AARCH64_SMC			U(0x17)
 #define EC_AARCH64_SYS			U(0x18)
+#define EC_IMP_DEF_EL3			U(0x1f)
 #define EC_IABORT_LOWER_EL		U(0x20)
 #define EC_IABORT_CUR_EL		U(0x21)
 #define EC_PC_ALIGN			U(0x22)
@@ -1204,7 +1232,9 @@
 
 /* MPAM register definitions */
 #define MPAM3_EL3_MPAMEN_BIT		(ULL(1) << 63)
+#define MPAM3_EL3_TRAPLOWER_BIT		(ULL(1) << 62)
 #define MPAMHCR_EL2_TRAP_MPAMIDR_EL1	(ULL(1) << 31)
+#define MPAM3_EL3_RESET_VAL		MPAM3_EL3_TRAPLOWER_BIT
 
 #define MPAM2_EL2_TRAPMPAM0EL1		(ULL(1) << 49)
 #define MPAM2_EL2_TRAPMPAM1EL1		(ULL(1) << 48)
@@ -1327,6 +1357,8 @@
 #define RGSR_EL1		S3_0_C1_C0_5
 #define GCR_EL1			S3_0_C1_C0_6
 
+#define GCR_EL1_RRND_BIT	(UL(1) << 16)
+
 /*******************************************************************************
  * Armv8.5 - Random Number Generator Registers
  ******************************************************************************/
@@ -1350,6 +1382,13 @@
 #define HCRX_EL2_EnALS_BIT	(UL(1) << 1)
 #define HCRX_EL2_EnAS0_BIT	(UL(1) << 0)
 #define HCRX_EL2_INIT_VAL	ULL(0x0)
+
+/*******************************************************************************
+ * FEAT_FGT - Definitions for Fine-Grained Trap registers
+ ******************************************************************************/
+#define HFGITR_EL2_INIT_VAL	ULL(0x180000000000000)
+#define HFGRTR_EL2_INIT_VAL	ULL(0xC4000000000000)
+#define HFGWTR_EL2_INIT_VAL	ULL(0xC4000000000000)
 
 /*******************************************************************************
  * FEAT_TCR2 - Extended Translation Control Register
@@ -1380,6 +1419,7 @@
 #define DSU_CLUSTER_PWR_OFF	0
 #define DSU_CLUSTER_PWR_ON	1
 #define DSU_CLUSTER_PWR_MASK	U(1)
+#define DSU_CLUSTER_MEM_RET	BIT(1)
 
 /*******************************************************************************
  * Definitions for CPU Power/Performance Management registers

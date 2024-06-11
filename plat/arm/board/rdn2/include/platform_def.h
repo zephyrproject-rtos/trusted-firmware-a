@@ -8,7 +8,7 @@
 #define PLATFORM_DEF_H
 
 #include <lib/utils_def.h>
-
+#include <sgi_sdei.h>
 #include <sgi_soc_platform_def_v2.h>
 
 #if (CSS_SGI_PLATFORM_VARIANT == 1)
@@ -101,5 +101,26 @@
 /* Interrupt priority level for shutdown/reboot */
 #define PLAT_REBOOT_PRI		GIC_HIGHEST_SEC_PRIORITY
 #define PLAT_EHF_DESC		EHF_PRI_DESC(PLAT_PRI_BITS, PLAT_REBOOT_PRI)
+
+/*
+ * Number of Secure Partitions supported.
+ * SPMC at EL3, uses this count to configure the maximum number of supported
+ * secure partitions.
+ */
+#define SECURE_PARTITION_COUNT          1
+
+/*
+ * Number of NWd Partitions supported.
+ * SPMC at EL3, uses this count to configure the maximum number of supported
+ * nwld partitions.
+ */
+#define NS_PARTITION_COUNT              1
+
+/*
+ * Number of Logical Partitions supported.
+ * SPMC at EL3, uses this count to configure the maximum number of supported
+ * logical partitions.
+ */
+#define MAX_EL3_LP_DESCS_COUNT		1
 
 #endif /* PLATFORM_DEF_H */

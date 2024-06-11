@@ -69,6 +69,13 @@ BL31_SOURCES	+=	drivers/arm/gic/v3/gic600_multichip.c
 BL31_CFLAGS		+=	-DPLAT_XLAT_TABLES_DYNAMIC
 endif
 
+ifeq (${ENABLE_FEAT_RAS}-${HANDLE_EA_EL3_FIRST_NS},1-1)
+BL31_SOURCES		+=	${RDN2_BASE}/rdn2_ras.c			\
+				${CSS_ENT_BASE}/ras/sgi_ras_common.c	\
+				${CSS_ENT_BASE}/ras/sgi_ras_sram.c	\
+				${CSS_ENT_BASE}/ras/sgi_ras_cpu.c
+endif
+
 # Add the FDT_SOURCES and options for Dynamic Config
 FDT_SOURCES		+=	${RDN2_BASE}/fdts/${PLAT}_fw_config.dts	\
 				${RDN2_BASE}/fdts/${PLAT}_tb_fw_config.dts
@@ -88,3 +95,25 @@ $(eval $(call TOOL_ADD_PAYLOAD,${NT_FW_CONFIG},--nt-fw-config))
 
 override CTX_INCLUDE_AARCH32_REGS	:= 0
 override ENABLE_FEAT_AMU		:= 1
+
+# Enable N2 CPU errata workarounds
+ERRATA_N2_2002655	:=	1
+ERRATA_N2_2009478	:=	1
+ERRATA_N2_2067956	:=	1
+ERRATA_N2_2025414	:=	1
+ERRATA_N2_2189731	:=	1
+ERRATA_N2_2138956	:=	1
+ERRATA_N2_2138953	:=	1
+ERRATA_N2_2242415	:=	1
+ERRATA_N2_2138958	:=	1
+ERRATA_N2_2242400	:=	1
+ERRATA_N2_2280757	:=	1
+ERRATA_N2_2326639	:=	1
+ERRATA_N2_2340933	:=	1
+ERRATA_N2_2346952	:=	1
+ERRATA_N2_2376738	:=	1
+ERRATA_N2_2388450	:=	1
+ERRATA_N2_2743014	:=	1
+ERRATA_N2_2743089	:=	1
+ERRATA_N2_2728475	:=	1
+ERRATA_N2_2779511	:=	1

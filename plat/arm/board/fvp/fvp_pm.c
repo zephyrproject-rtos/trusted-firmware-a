@@ -65,25 +65,6 @@ static void fvp_cluster_pwrdwn_common(void)
 	/* Disable coherency if this cluster is to be turned off */
 	fvp_interconnect_disable();
 
-#if HW_ASSISTED_COHERENCY
-	uint32_t reg;
-
-	/*
-	 * If we have determined this core to be the last man standing and we
-	 * intend to power down the cluster proactively, we provide a hint to
-	 * the power controller that cluster power is not required when all
-	 * cores are powered down.
-	 * Note that this is only an advisory to power controller and is supported
-	 * by SoCs with DynamIQ Shared Units only.
-	 */
-	reg = read_clusterpwrdn();
-
-	/* Clear and set bit 0 : Cluster power not required */
-	reg &= ~DSU_CLUSTER_PWR_MASK;
-	reg |= DSU_CLUSTER_PWR_OFF;
-	write_clusterpwrdn(reg);
-#endif
-
 	/* Program the power controller to turn the cluster off */
 	fvp_pwrc_write_pcoffr(mpidr);
 }
@@ -228,11 +209,7 @@ static void fvp_pwr_domain_off(const psci_power_state_t *target_state)
  * FVP handler called when a power domain is about to be suspended. The
  * target_state encodes the power state that each level should transition to.
  ******************************************************************************/
-#if PSCI_OS_INIT_MODE
-static int fvp_pwr_domain_suspend(const psci_power_state_t *target_state)
-#else
 static void fvp_pwr_domain_suspend(const psci_power_state_t *target_state)
-#endif
 {
 	unsigned long mpidr;
 
@@ -242,11 +219,7 @@ static void fvp_pwr_domain_suspend(const psci_power_state_t *target_state)
 	 */
 	if (target_state->pwr_domain_state[ARM_PWR_LVL0] ==
 					ARM_LOCAL_STATE_RET)
-#if PSCI_OS_INIT_MODE
-		return PSCI_E_SUCCESS;
-#else
 		return;
-#endif
 
 	assert(target_state->pwr_domain_state[ARM_PWR_LVL0] ==
 					ARM_LOCAL_STATE_OFF);
@@ -279,11 +252,7 @@ static void fvp_pwr_domain_suspend(const psci_power_state_t *target_state)
 	/* Program the power controller to power off this cpu. */
 	fvp_pwrc_write_ppoffr(read_mpidr_el1());
 
-#if PSCI_OS_INIT_MODE
-	return PSCI_E_SUCCESS;
-#else
 	return;
-#endif
 }
 
 /*******************************************************************************
@@ -405,6 +374,10 @@ static void fvp_get_sys_suspend_power_state(psci_power_state_t *req_state)
 
 	for (i = ARM_PWR_LVL0; i <= PLAT_MAX_PWR_LVL; i++)
 		req_state->pwr_domain_state[i] = ARM_LOCAL_STATE_OFF;
+
+#if PSCI_OS_INIT_MODE
+	req_state->last_at_pwrlvl = PLAT_MAX_PWR_LVL;
+#endif
 }
 #endif
 

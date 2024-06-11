@@ -6,8 +6,12 @@
 include common/fdt_wrappers.mk
 
 ifeq ($(TARGET_PLATFORM), 0)
-$(warning Platform ${PLAT}$(TARGET_PLATFORM) is deprecated. \
-Some of the features might not work as expected)
+	$(error Platform ${PLAT}$(TARGET_PLATFORM) is deprecated.)
+endif
+
+ifeq ($(TARGET_PLATFORM), 1)
+        $(warning Platform ${PLAT}$(TARGET_PLATFORM) is deprecated. \
+          Some of the features might not work as expected)
 endif
 
 ifeq ($(shell expr $(TARGET_PLATFORM) \<= 2), 0)
@@ -21,8 +25,6 @@ CSS_LOAD_SCP_IMAGES	:=	1
 CSS_USE_SCMI_SDS_DRIVER	:=	1
 
 ENABLE_FEAT_RAS		:=	1
-
-RAS_FFH_SUPPORT		:=	0
 
 SDEI_SUPPORT		:=	0
 
@@ -70,13 +72,6 @@ TC_BASE	=	plat/arm/board/tc
 
 PLAT_INCLUDES		+=	-I${TC_BASE}/include/
 
-# CPU libraries for TARGET_PLATFORM=0
-ifeq (${TARGET_PLATFORM}, 0)
-TC_CPU_SOURCES	+=	lib/cpus/aarch64/cortex_a510.S	\
-			lib/cpus/aarch64/cortex_a710.S	\
-			lib/cpus/aarch64/cortex_x2.S
-endif
-
 # CPU libraries for TARGET_PLATFORM=1
 ifeq (${TARGET_PLATFORM}, 1)
 TC_CPU_SOURCES	+=	lib/cpus/aarch64/cortex_a510.S \
@@ -86,9 +81,9 @@ endif
 
 # CPU libraries for TARGET_PLATFORM=2
 ifeq (${TARGET_PLATFORM}, 2)
-TC_CPU_SOURCES	+=	lib/cpus/aarch64/cortex_hayes.S \
-			lib/cpus/aarch64/cortex_hunter.S \
-			lib/cpus/aarch64/cortex_hunter_elp_arm.S
+TC_CPU_SOURCES	+=	lib/cpus/aarch64/cortex_a520.S \
+			lib/cpus/aarch64/cortex_a720.S \
+			lib/cpus/aarch64/cortex_x4.S
 endif
 
 INTERCONNECT_SOURCES	:=	${TC_BASE}/tc_interconnect.c
@@ -197,31 +192,11 @@ PLAT_INCLUDES		+=	-Iinclude/lib/psa
 endif
 
 ifneq (${PLATFORM_TEST},)
-    $(eval $(call add_define,PLATFORM_TESTS))
-
-    ifeq (${PLATFORM_TEST},rss-nv-counters)
-        include drivers/arm/rss/rss_comms.mk
-
-        # Test code.
-        BL31_SOURCES	+=	plat/arm/board/tc/nv_counter_test.c
-
-        # Code under testing.
-        BL31_SOURCES	+=	lib/psa/rss_platform.c \
-				drivers/arm/rss/rss_comms.c \
-				${RSS_COMMS_SOURCES}
-
-        PLAT_INCLUDES	+=	-Iinclude/lib/psa
-
-        $(eval $(call add_define,PLATFORM_TEST_NV_COUNTERS))
-    else ifeq (${PLATFORM_TEST},tfm-testsuite)
-        # Add this include as first, before arm_common.mk. This is necessary
-        # because arm_common.mk builds Mbed TLS, and platform_test.mk can
-        # change the list of Mbed TLS files that are to be compiled
-        # (LIBMBEDTLS_SRCS).
-        include plat/arm/board/tc/platform_test.mk
-    else
-        $(error "Unsupported PLATFORM_TEST value")
-    endif
+    # Add this include as first, before arm_common.mk. This is necessary
+    # because arm_common.mk builds Mbed TLS, and platform_test.mk can
+    # change the list of Mbed TLS files that are to be compiled
+    # (LIBMBEDTLS_SRCS).
+    include plat/arm/board/tc/platform_test.mk
 endif
 
 
