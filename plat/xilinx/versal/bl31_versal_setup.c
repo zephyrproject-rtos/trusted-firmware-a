@@ -1,30 +1,30 @@
 /*
  * Copyright (c) 2018-2021, Arm Limited and Contributors. All rights reserved.
  * Copyright (c) 2018-2022, Xilinx, Inc. All rights reserved.
- * Copyright (c) 2022, Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
 #include <assert.h>
 #include <errno.h>
-#include <plat_arm.h>
-#include <plat_private.h>
+
 #include <bl31/bl31.h>
 #include <common/bl_common.h>
 #include <common/debug.h>
-#include <drivers/arm/dcc.h>
-#include <drivers/arm/pl011.h>
-#include <drivers/console.h>
 #include <lib/mmio.h>
 #include <lib/xlat_tables/xlat_tables_v2.h>
 #include <plat/common/platform.h>
-#include <versal_def.h>
+#include <plat_arm.h>
+#include <plat_console.h>
+
+#include <plat_fdt.h>
 #include <plat_private.h>
 #include <plat_startup.h>
-#include <pm_ipi.h>
-#include "pm_client.h"
 #include "pm_api_sys.h"
+#include "pm_client.h"
+#include <pm_ipi.h>
+#include <versal_def.h>
 
 static entry_point_info_t bl32_image_ep_info;
 static entry_point_info_t bl33_image_ep_info;
@@ -67,36 +67,18 @@ static inline void bl31_set_default_config(void)
 void bl31_early_platform_setup2(u_register_t arg0, u_register_t arg1,
 				u_register_t arg2, u_register_t arg3)
 {
-	uint64_t atf_handoff_addr;
-	uint32_t payload[PAYLOAD_ARG_CNT], max_size = ATF_HANDOFF_PARAMS_MAX_SIZE;
+	uint64_t tfa_handoff_addr;
+	uint32_t payload[PAYLOAD_ARG_CNT], max_size = HANDOFF_PARAMS_MAX_SIZE;
 	enum pm_ret_status ret_status;
-	uint64_t addr[ATF_HANDOFF_PARAMS_MAX_SIZE];
+	uint64_t addr[HANDOFF_PARAMS_MAX_SIZE];
 
-	if (VERSAL_CONSOLE_IS(pl011) || (VERSAL_CONSOLE_IS(pl011_1))) {
-		static console_t versal_runtime_console;
-		/* Initialize the console to provide early debug support */
-		int32_t rc = console_pl011_register((uintptr_t)VERSAL_UART_BASE,
-						(uint32_t)VERSAL_UART_CLOCK,
-						(uint32_t)VERSAL_UART_BAUDRATE,
-						&versal_runtime_console);
-		if (rc == 0) {
-			panic();
-		}
-
-		console_set_scope(&versal_runtime_console, (uint32_t)(CONSOLE_FLAG_BOOT |
-				  CONSOLE_FLAG_RUNTIME));
-	} else if (VERSAL_CONSOLE_IS(dcc)) {
-		/* Initialize the dcc console for debug */
-		int32_t rc = console_dcc_register();
-		if (rc == 0) {
-			panic();
-		}
-	} else {
-		NOTICE("BL31: Did not register for any console.\n");
-	}
+	setup_console();
 
 	/* Initialize the platform config for future decision making */
 	versal_config_setup();
+
+	/* Get platform related information */
+	board_detection();
 
 	/*
 	 * Do initial security configuration to allow DRAM/device access. On
@@ -116,23 +98,36 @@ void bl31_early_platform_setup2(u_register_t arg0, u_register_t arg1,
 	ret_status = pm_ipi_send_sync(primary_proc, payload, NULL, 0);
 	if (ret_status == PM_RET_SUCCESS) {
 		INFO("BL31: GET_HANDOFF_PARAMS call success=%d\n", ret_status);
-		atf_handoff_addr = (uintptr_t)&addr;
+		tfa_handoff_addr = (uintptr_t)&addr;
 	} else {
-		ERROR("BL31: GET_HANDOFF_PARAMS Failed, read atf_handoff_addr from reg\n");
-		atf_handoff_addr = mmio_read_32(PMC_GLOBAL_GLOB_GEN_STORAGE4);
+		ERROR("BL31: GET_HANDOFF_PARAMS Failed, read tfa_handoff_addr from reg\n");
+		tfa_handoff_addr = mmio_read_32(PMC_GLOBAL_GLOB_GEN_STORAGE4);
 	}
 
-	enum fsbl_handoff ret = fsbl_atf_handover(&bl32_image_ep_info,
+	enum xbl_handoff ret = xbl_handover(&bl32_image_ep_info,
 						  &bl33_image_ep_info,
-						  atf_handoff_addr);
-	if (ret == FSBL_HANDOFF_NO_STRUCT || ret == FSBL_HANDOFF_INVAL_STRUCT) {
+						  tfa_handoff_addr);
+	if (ret == XBL_HANDOFF_NO_STRUCT || ret == XBL_HANDOFF_INVAL_STRUCT) {
 		bl31_set_default_config();
-	} else if (ret == FSBL_HANDOFF_TOO_MANY_PARTS) {
+	} else if (ret == XBL_HANDOFF_TOO_MANY_PARTS) {
 		ERROR("BL31: Error too many partitions %u\n", ret);
-	} else if (ret != FSBL_HANDOFF_SUCCESS) {
+	} else if (ret != XBL_HANDOFF_SUCCESS) {
 		panic();
 	} else {
 		INFO("BL31: PLM to TF-A handover success %u\n", ret);
+
+		/*
+		 * The BL32 load address is indicated as 0x0 in the handoff
+		 * parameters, which is different from the default/user-provided
+		 * load address of 0x60000000 but the flags are correctly
+		 * configured. Consequently, in this scenario, set the PC
+		 * to the requested BL32_BASE address.
+		 */
+
+		/* TODO: Remove the following check once this is fixed from PLM */
+		if (bl32_image_ep_info.pc == 0 && bl32_image_ep_info.spsr != 0) {
+			bl32_image_ep_info.pc = (uintptr_t)BL32_BASE;
+		}
 	}
 
 	NOTICE("BL31: Secure code at 0x%lx\n", bl32_image_ep_info.pc);
@@ -187,8 +182,11 @@ static uint64_t rdo_el3_interrupt_handler(uint32_t id, uint32_t flags,
 
 	return 0;
 }
+
 void bl31_platform_setup(void)
 {
+	prepare_dtb();
+
 	/* Initialize the gic cpu and distributor interfaces */
 	plat_versal_gic_driver_init();
 	plat_versal_gic_init();
@@ -205,6 +203,8 @@ void bl31_plat_runtime_setup(void)
 	if (rc != 0) {
 		panic();
 	}
+
+	console_switch_state(CONSOLE_FLAG_RUNTIME);
 }
 
 /*
@@ -216,6 +216,11 @@ void bl31_plat_arch_setup(void)
 	plat_arm_interconnect_enter_coherency();
 
 	const mmap_region_t bl_regions[] = {
+#if (defined(XILINX_OF_BOARD_DTB_ADDR) && !IS_TFA_IN_OCM(BL31_BASE) && \
+	(!defined(PLAT_XLAT_TABLES_DYNAMIC)))
+		MAP_REGION_FLAT(XILINX_OF_BOARD_DTB_ADDR, XILINX_OF_BOARD_DTB_MAX_SIZE,
+				MT_MEMORY | MT_RW | MT_NS),
+#endif
 		MAP_REGION_FLAT(BL31_BASE, BL31_END - BL31_BASE,
 			MT_MEMORY | MT_RW | MT_SECURE),
 		MAP_REGION_FLAT(BL_CODE_BASE, BL_CODE_END - BL_CODE_BASE,
@@ -228,6 +233,6 @@ void bl31_plat_arch_setup(void)
 		{0}
 	};
 
-	setup_page_tables(bl_regions, plat_versal_get_mmap());
+	setup_page_tables(bl_regions, plat_get_mmap());
 	enable_mmu(0);
 }

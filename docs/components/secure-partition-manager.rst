@@ -152,6 +152,8 @@ SPMC located at S-EL1, S-EL2 or EL3:
   exception level is set to S-EL1.
   ``SPMD_SPM_AT_SEL2`` is enabled. The context save/restore routine
   and exhaustive list of registers is visible at `[4]`_.
+- **SPMC_AT_EL3_SEL0_SP**: this option enables the support to load SEL0 SP
+  when SPMC at EL3 support is enabled.
 - **SP_LAYOUT_FILE**: this option specifies a text description file
   providing paths to SP binary images and manifests in DTS format
   (see `Describing secure partitions`_). It
@@ -203,6 +205,7 @@ Sample TF-A build command line when the SPMC is located at S-EL1
 
 Sample TF-A build command line when FEAT_SEL2 architecture extension is
 implemented and the SPMC is located at S-EL2:
+
 .. code:: shell
 
     make \
@@ -220,6 +223,7 @@ implemented and the SPMC is located at S-EL2:
 
 Sample TF-A build command line when FEAT_SEL2 architecture extension is
 implemented, the SPMC is located at S-EL2, and enabling secure boot:
+
 .. code:: shell
 
     make \
@@ -250,6 +254,22 @@ Sample TF-A build command line when the SPMC is located at EL3:
     SPD=spmd \
     SPMD_SPM_AT_SEL2=0 \
     SPMC_AT_EL3=1 \
+    BL32=<path-to-tee-binary> \
+    BL33=<path-to-bl33-binary> \
+    PLAT=fvp \
+    all fip
+
+Sample TF-A build command line when the SPMC is located at EL3 and SEL0 SP is
+enabled:
+
+.. code:: shell
+
+    make \
+    CROSS_COMPILE=aarch64-none-elf- \
+    SPD=spmd \
+    SPMD_SPM_AT_SEL2=0 \
+    SPMC_AT_EL3=1 \
+    SPMC_AT_EL3_SEL0_SP=1 \
     BL32=<path-to-tee-binary> \
     BL33=<path-to-bl33-binary> \
     PLAT=fvp \

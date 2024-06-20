@@ -1,7 +1,7 @@
 /*
  * Copyright (c) 2018-2022, Arm Limited and Contributors. All rights reserved.
  * Copyright (c) 2019-2022, Xilinx, Inc. All rights reserved.
- * Copyright (c) 2022, Advanced Micro Devices, Inc. All rights reserved.
+ * Copyright (c) 2022-2023, Advanced Micro Devices, Inc. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -12,6 +12,9 @@
 #include <plat/arm/common/smccc_def.h>
 #include <plat/common/common_def.h>
 
+#define PLATFORM_MASK                  GENMASK(27U, 24U)
+#define PLATFORM_VERSION_MASK          GENMASK(31U, 28U)
+
 /* number of interrupt handlers. increase as required */
 #define MAX_INTR_EL3			2
 /* List all consoles */
@@ -20,7 +23,7 @@
 #define VERSAL_CONSOLE_ID_pl011_1	2
 #define VERSAL_CONSOLE_ID_dcc		3
 
-#define VERSAL_CONSOLE_IS(con)	(VERSAL_CONSOLE_ID_ ## con == VERSAL_CONSOLE)
+#define CONSOLE_IS(con)	(VERSAL_CONSOLE_ID_ ## con == VERSAL_CONSOLE)
 
 /* List all supported platforms */
 #define VERSAL_PLATFORM_ID_versal_virt	1
@@ -45,6 +48,7 @@
  * IRQ constants
  ******************************************************************************/
 #define VERSAL_IRQ_SEC_PHY_TIMER		U(29)
+#define ARM_IRQ_SEC_PHY_TIMER	29
 
 /*******************************************************************************
  * CCI-400 related constants
@@ -60,40 +64,36 @@
 #define VERSAL_UART0_BASE		0xFF000000
 #define VERSAL_UART1_BASE		0xFF010000
 
-#if VERSAL_CONSOLE_IS(pl011) || VERSAL_CONSOLE_IS(dcc)
-# define VERSAL_UART_BASE	VERSAL_UART0_BASE
-#elif VERSAL_CONSOLE_IS(pl011_1)
-# define VERSAL_UART_BASE	VERSAL_UART1_BASE
+#if CONSOLE_IS(pl011) || CONSOLE_IS(dcc)
+# define UART_BASE	VERSAL_UART0_BASE
+#elif CONSOLE_IS(pl011_1)
+# define UART_BASE	VERSAL_UART1_BASE
 #else
 # error "invalid VERSAL_CONSOLE"
 #endif
-
-#define PLAT_VERSAL_CRASH_UART_BASE		VERSAL_UART_BASE
-#define PLAT_VERSAL_CRASH_UART_CLK_IN_HZ	VERSAL_UART_CLOCK
-#define VERSAL_CONSOLE_BAUDRATE			VERSAL_UART_BAUDRATE
 
 /*******************************************************************************
  * Platform related constants
  ******************************************************************************/
 #if VERSAL_PLATFORM_IS(versal_virt)
 # define PLATFORM_NAME		"Versal Virt"
-# define VERSAL_UART_CLOCK	25000000
-# define VERSAL_UART_BAUDRATE	115200
+# define UART_CLOCK	25000000
+# define UART_BAUDRATE	115200
 # define VERSAL_CPU_CLOCK	2720000
 #elif VERSAL_PLATFORM_IS(silicon)
 # define PLATFORM_NAME		"Versal Silicon"
-# define VERSAL_UART_CLOCK	100000000
-# define VERSAL_UART_BAUDRATE	115200
+# define UART_CLOCK	100000000
+# define UART_BAUDRATE	115200
 # define VERSAL_CPU_CLOCK	100000000
 #elif VERSAL_PLATFORM_IS(spp_itr6)
 # define PLATFORM_NAME		"SPP ITR6"
-# define VERSAL_UART_CLOCK	25000000
-# define VERSAL_UART_BAUDRATE	115200
+# define UART_CLOCK	25000000
+# define UART_BAUDRATE	115200
 # define VERSAL_CPU_CLOCK	2720000
 #elif VERSAL_PLATFORM_IS(emu_itr6)
 # define PLATFORM_NAME		"EMU ITR6"
-# define VERSAL_UART_CLOCK	212000
-# define VERSAL_UART_BAUDRATE	9600
+# define UART_CLOCK	212000
+# define UART_BAUDRATE	9600
 # define VERSAL_CPU_CLOCK	212000
 #endif
 
@@ -125,21 +125,5 @@
 /* PMC registers and bitfields */
 #define PMC_GLOBAL_BASE			0xF1110000U
 #define PMC_GLOBAL_GLOB_GEN_STORAGE4	(PMC_GLOBAL_BASE + 0x40U)
-
-/* IPI registers and bitfields */
-#define PMC_REG_BASE		U(0xFF320000)
-#define PMC_IPI_TRIG_BIT	(1U << 1U)
-#define IPI0_REG_BASE		U(0xFF330000)
-#define IPI0_TRIG_BIT		(1U << 2U)
-#define IPI1_REG_BASE		U(0xFF340000)
-#define IPI1_TRIG_BIT		(1U << 3U)
-#define IPI2_REG_BASE		U(0xFF350000)
-#define IPI2_TRIG_BIT		(1U << 4U)
-#define IPI3_REG_BASE		U(0xFF360000)
-#define IPI3_TRIG_BIT		(1U << 5U)
-#define IPI4_REG_BASE		U(0xFF370000)
-#define IPI4_TRIG_BIT		(1U << 5U)
-#define IPI5_REG_BASE		U(0xFF380000)
-#define IPI5_TRIG_BIT		(1U << 6U)
 
 #endif /* VERSAL_DEF_H */

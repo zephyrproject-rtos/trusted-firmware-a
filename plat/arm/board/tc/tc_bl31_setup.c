@@ -59,6 +59,8 @@ static __dead2 void tc_run_platform_tests(void)
 
 #ifdef PLATFORM_TEST_NV_COUNTERS
 	tests_failed = nv_counter_test();
+#elif PLATFORM_TEST_ROTPK
+	tests_failed = rotpk_test();
 #elif PLATFORM_TEST_TFM_TESTSUITE
 	tests_failed = run_platform_tests();
 #endif
@@ -120,12 +122,9 @@ int plat_spmd_handle_group0_interrupt(uint32_t intid)
 {
 	/* Trusted Watchdog timer is the only source of Group0 interrupt now. */
 	if (intid == SBSA_SECURE_WDOG_INTID) {
-		INFO("Watchdog restarted\n");
 		/* Refresh the timer. */
 		plat_arm_secure_wdt_refresh();
 
-		/* Deactivate the corresponding interrupt. */
-		plat_ic_end_of_interrupt(intid);
 		return 0;
 	}
 

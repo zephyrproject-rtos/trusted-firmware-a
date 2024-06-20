@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, Arm Limited. All rights reserved.
+ * Copyright (c) 2022-2023, Arm Limited. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -32,39 +32,42 @@
 #  error Invalid Measured Boot algorithm.
 #endif /* MBOOT_ALG_ID */
 
-/* Pointer to struct rss_mboot_metadata */
-static struct rss_mboot_metadata *plat_metadata_ptr;
+#if ENABLE_ASSERTIONS
+static bool null_arr(const uint8_t *signer_id, size_t signer_id_size)
+{
+	for (size_t i = 0U; i < signer_id_size; i++) {
+		if (signer_id[i] != 0U) {
+			return false;
+		}
+	}
+
+	return true;
+}
+#endif /* ENABLE_ASSERTIONS */
 
 /* Functions' declarations */
-void rss_measured_boot_init(void)
+void rss_measured_boot_init(struct rss_mboot_metadata *metadata_ptr)
 {
-	/* At this point it is expected that communication channel over MHU
-	 * is already initialised by platform init.
-	 */
-	struct rss_mboot_metadata *metadata_ptr;
-
-	/* Get pointer to platform's struct rss_mboot_metadata structure */
-	plat_metadata_ptr = plat_rss_mboot_get_metadata();
-	assert(plat_metadata_ptr != NULL);
-
-	/* Use a local variable to preserve the value of the global pointer */
-	metadata_ptr = plat_metadata_ptr;
+	assert(metadata_ptr != NULL);
 
 	/* Init the non-const members of the metadata structure */
 	while (metadata_ptr->id != RSS_MBOOT_INVALID_ID) {
+		assert(null_arr(metadata_ptr->signer_id, MBOOT_DIGEST_SIZE));
 		metadata_ptr->sw_type_size =
 			strlen((const char *)&metadata_ptr->sw_type) + 1;
 		metadata_ptr++;
 	}
 }
 
-int rss_mboot_measure_and_record(uintptr_t data_base, uint32_t data_size,
+int rss_mboot_measure_and_record(struct rss_mboot_metadata *metadata_ptr,
+				 uintptr_t data_base, uint32_t data_size,
 				 uint32_t data_id)
 {
 	unsigned char hash_data[CRYPTO_MD_MAX_SIZE];
 	int rc;
 	psa_status_t ret;
-	const struct rss_mboot_metadata *metadata_ptr = plat_metadata_ptr;
+
+	assert(metadata_ptr != NULL);
 
 	/* Get the metadata associated with this image. */
 	while ((metadata_ptr->id != RSS_MBOOT_INVALID_ID) &&
@@ -103,35 +106,54 @@ int rss_mboot_measure_and_record(uintptr_t data_base, uint32_t data_size,
 	return 0;
 }
 
-int rss_mboot_set_signer_id(unsigned int img_id,
+int rss_mboot_set_signer_id(struct rss_mboot_metadata *metadata_ptr,
+			    const void *pk_oid,
 			    const void *pk_ptr,
 			    size_t pk_len)
 {
 	unsigned char hash_data[CRYPTO_MD_MAX_SIZE];
-	struct rss_mboot_metadata *metadata_ptr = plat_metadata_ptr;
 	int rc;
+	bool hash_calc_done = false;
 
-	/* Get the metadata associated with this image. */
-	while ((metadata_ptr->id != RSS_MBOOT_INVALID_ID) &&
-		(metadata_ptr->id != img_id)) {
+	assert(metadata_ptr != NULL);
+
+	/*
+	 * Do an exhaustive search over the platform metadata to find
+	 * all images whose key OID matches the one passed in argument.
+	 *
+	 * Note that it is not an error if do not get any matches.
+	 * The platform may decide not to measure all of the images
+	 * in the system.
+	 */
+	while (metadata_ptr->id != RSS_MBOOT_INVALID_ID) {
+		/* Get the metadata associated with this key-oid */
+		if (metadata_ptr->pk_oid == pk_oid) {
+			if (!hash_calc_done) {
+				/* Calculate public key hash */
+				rc = crypto_mod_calc_hash(CRYPTO_MD_ID,
+							  (void *)pk_ptr,
+							  pk_len, hash_data);
+				if (rc != 0) {
+					return rc;
+				}
+
+				hash_calc_done = true;
+			}
+
+			/*
+			 * Fill the signer-ID field with the newly/already
+			 * computed hash of the public key and update its
+			 * signer ID size field with compile-time decided
+			 * digest size.
+			 */
+			(void)memcpy(metadata_ptr->signer_id,
+				     hash_data,
+				     MBOOT_DIGEST_SIZE);
+			metadata_ptr->signer_id_size = MBOOT_DIGEST_SIZE;
+		}
+
 		metadata_ptr++;
 	}
-
-	/* If image is not present in metadata array then skip */
-	if (metadata_ptr->id == RSS_MBOOT_INVALID_ID) {
-		return 0;
-	}
-
-	/* Calculate public key hash */
-	rc = crypto_mod_calc_hash(CRYPTO_MD_ID, (void *)pk_ptr,
-				  pk_len, hash_data);
-	if (rc != 0) {
-		return rc;
-	}
-
-	/* Update metadata struct with the received signer_id */
-	(void)memcpy(metadata_ptr->signer_id, hash_data, MBOOT_DIGEST_SIZE);
-	metadata_ptr->signer_id_size = MBOOT_DIGEST_SIZE;
 
 	return 0;
 }

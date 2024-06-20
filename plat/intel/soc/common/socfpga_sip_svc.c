@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019-2022, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2019-2023, ARM Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -12,9 +12,10 @@
 
 #include "socfpga_fcs.h"
 #include "socfpga_mailbox.h"
+#include "socfpga_plat_def.h"
 #include "socfpga_reset_manager.h"
 #include "socfpga_sip_svc.h"
-
+#include "socfpga_system_manager.h"
 
 /* Total buffer the driver can hold */
 #define FPGA_CONFIG_BUFFER_SIZE 4
@@ -334,6 +335,7 @@ static int is_out_of_sec_range(uint64_t reg_addr)
 	return 0;
 #endif
 
+#if PLATFORM_MODEL != PLAT_SOCFPGA_AGILEX5
 	switch (reg_addr) {
 	case(0xF8011100):	/* ECCCTRL1 */
 	case(0xF8011104):	/* ECCCTRL2 */
@@ -385,7 +387,41 @@ static int is_out_of_sec_range(uint64_t reg_addr)
 	case(0xFFD12220):	/* BOOT_SCRATCH_COLD8 */
 	case(0xFFD12224):	/* BOOT_SCRATCH_COLD9 */
 		return 0;
+#else
+	switch (reg_addr) {
 
+	case(0xF8011104):	/* ECCCTRL2 */
+	case(0xFFD12028):	/* SDMMCGRP_CTRL */
+	case(0xFFD120C4):	/* NOC_IDLEREQ_SET */
+	case(0xFFD120C8):	/* NOC_IDLEREQ_CLR */
+	case(0xFFD120D0):	/* NOC_IDLEACK */
+
+
+	case(SOCFPGA_MEMCTRL(ECCCTRL1)):	/* ECCCTRL1 */
+	case(SOCFPGA_MEMCTRL(ERRINTEN)):	/* ERRINTEN */
+	case(SOCFPGA_MEMCTRL(ERRINTENS)):	/* ERRINTENS */
+	case(SOCFPGA_MEMCTRL(ERRINTENR)):	/* ERRINTENR */
+	case(SOCFPGA_MEMCTRL(INTMODE)):	/* INTMODE */
+	case(SOCFPGA_MEMCTRL(INTSTAT)):	/* INTSTAT */
+	case(SOCFPGA_MEMCTRL(DIAGINTTEST)):	/* DIAGINTTEST */
+	case(SOCFPGA_MEMCTRL(DERRADDRA)):	/* DERRADDRA */
+
+	case(SOCFPGA_SYSMGR(EMAC_0)):	/* EMAC0 */
+	case(SOCFPGA_SYSMGR(EMAC_1)):	/* EMAC1 */
+	case(SOCFPGA_SYSMGR(EMAC_2)):	/* EMAC2 */
+	case(SOCFPGA_SYSMGR(ECC_INTMASK_VALUE)):	/* ECC_INT_MASK_VALUE */
+	case(SOCFPGA_SYSMGR(ECC_INTMASK_SET)):	/* ECC_INT_MASK_SET */
+	case(SOCFPGA_SYSMGR(ECC_INTMASK_CLR)):	/* ECC_INT_MASK_CLEAR */
+	case(SOCFPGA_SYSMGR(ECC_INTMASK_SERR)):	/* ECC_INTSTATUS_SERR */
+	case(SOCFPGA_SYSMGR(ECC_INTMASK_DERR)):	/* ECC_INTSTATUS_DERR */
+	case(SOCFPGA_SYSMGR(NOC_TIMEOUT)):	/* NOC_TIMEOUT */
+	case(SOCFPGA_SYSMGR(NOC_IDLESTATUS)):	/* NOC_IDLESTATUS */
+	case(SOCFPGA_SYSMGR(BOOT_SCRATCH_COLD_0)):	/* BOOT_SCRATCH_COLD0 */
+	case(SOCFPGA_SYSMGR(BOOT_SCRATCH_COLD_1)):	/* BOOT_SCRATCH_COLD1 */
+	case(SOCFPGA_SYSMGR(BOOT_SCRATCH_COLD_8)):	/* BOOT_SCRATCH_COLD8 */
+	case(SOCFPGA_SYSMGR(BOOT_SCRATCH_COLD_9)):	/* BOOT_SCRATCH_COLD9 */
+		return 0;
+#endif
 	default:
 		break;
 	}
@@ -441,8 +477,12 @@ static uint32_t intel_rsu_status(uint64_t *respbuf, unsigned int respbuf_sz)
 	return INTEL_SIP_SMC_STATUS_OK;
 }
 
-static uint32_t intel_rsu_update(uint64_t update_address)
+uint32_t intel_rsu_update(uint64_t update_address)
 {
+	if (update_address > SIZE_MAX) {
+		return INTEL_SIP_SMC_STATUS_REJECTED;
+	}
+
 	intel_rsu_update_address = update_address;
 	return INTEL_SIP_SMC_STATUS_OK;
 }
@@ -648,6 +688,16 @@ uint32_t intel_hps_set_bridges(uint64_t enable, uint64_t mask)
 	return INTEL_SIP_SMC_STATUS_OK;
 }
 
+/* SDM SEU Error services */
+static uint32_t intel_sdm_seu_err_read(uint64_t *respbuf, unsigned int respbuf_sz)
+{
+	if (mailbox_seu_err_status((uint32_t *)respbuf, respbuf_sz) < 0) {
+		return INTEL_SIP_SMC_SEU_ERR_READ_ERROR;
+	}
+
+	return INTEL_SIP_SMC_STATUS_OK;
+}
+
 /*
  * This function is responsible for handling all SiP calls from the NS world
  */
@@ -664,7 +714,7 @@ uintptr_t sip_smc_handler_v1(uint32_t smc_fid,
 	uint32_t retval = 0, completed_addr[3];
 	uint32_t retval2 = 0;
 	uint32_t mbox_error = 0;
-	uint64_t retval64, rsu_respbuf[9];
+	uint64_t retval64, rsu_respbuf[9], seu_respbuf[3];
 	int status = INTEL_SIP_SMC_STATUS_OK;
 	int mbox_status;
 	unsigned int len_in_resp;
@@ -1169,6 +1219,15 @@ uintptr_t sip_smc_handler_v1(uint32_t smc_fid,
 		SMC_RET3(handle, INTEL_SIP_SMC_STATUS_OK,
 					SIP_SVC_VERSION_MAJOR,
 					SIP_SVC_VERSION_MINOR);
+
+	case INTEL_SIP_SMC_SEU_ERR_STATUS:
+		status = intel_sdm_seu_err_read(seu_respbuf,
+					ARRAY_SIZE(seu_respbuf));
+		if (status) {
+			SMC_RET1(handle, status);
+		} else {
+			SMC_RET3(handle, seu_respbuf[0], seu_respbuf[1], seu_respbuf[2]);
+		}
 
 	default:
 		return socfpga_sip_handler(smc_fid, x1, x2, x3, x4,

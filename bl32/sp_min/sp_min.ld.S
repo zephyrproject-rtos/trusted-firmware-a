@@ -20,6 +20,8 @@ MEMORY {
 #endif /* PLAT_SP_MIN_EXTRA_LD_SCRIPT */
 
 SECTIONS {
+    RAM_REGION_START = ORIGIN(RAM);
+    RAM_REGION_LENGTH = LENGTH(RAM);
     . = BL32_BASE;
 
     ASSERT(. == ALIGN(PAGE_SIZE),
@@ -32,6 +34,7 @@ SECTIONS {
         *entrypoint.o(.text*)
         *(SORT_BY_ALIGNMENT(.text*))
         *(.vectors)
+        __TEXT_END_UNALIGNED__ = .;
 
         . = ALIGN(PAGE_SIZE);
 
@@ -56,6 +59,7 @@ SECTIONS {
         . = ALIGN(8);
 
 #   include <lib/el3_runtime/pubsub_events.h>
+        __RODATA_END_UNALIGNED__ = .;
 
         . = ALIGN(PAGE_SIZE);
 
@@ -149,4 +153,5 @@ SECTIONS {
     }
 
     ASSERT(. <= BL32_LIMIT, "BL32 image has exceeded its limit.")
+    RAM_REGION_END = .;
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2023, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2016-2023, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -104,7 +104,11 @@
 /* CSSELR definitions */
 #define LEVEL_SHIFT		U(1)
 
-/* ID_DFR0_EL1 definitions */
+/* ID_DFR0 definitions */
+#define ID_DFR0_PERFMON_SHIFT		U(24)
+#define ID_DFR0_PERFMON_MASK		U(0xf)
+#define ID_DFR0_PERFMON_PMUV3		U(3)
+#define ID_DFR0_PERFMON_PMUV3P5		U(6)
 #define ID_DFR0_COPTRC_SHIFT		U(12)
 #define ID_DFR0_COPTRC_MASK		U(0xf)
 #define ID_DFR0_COPTRC_SUPPORTED	U(1)
@@ -118,6 +122,11 @@
 #define ID_DFR1_MTPMU_SHIFT	U(0)
 #define ID_DFR1_MTPMU_MASK	U(0xf)
 #define ID_DFR1_MTPMU_SUPPORTED	U(1)
+#define ID_DFR1_MTPMU_DISABLED	U(15)
+
+/* ID_MMFR3 definitions */
+#define ID_MMFR3_PAN_SHIFT	U(16)
+#define ID_MMFR3_PAN_MASK	U(0xf)
 
 /* ID_MMFR4 definitions */
 #define ID_MMFR4_CNP_SHIFT	U(12)
@@ -188,11 +197,11 @@
 #define SDCR_SPD_LEGACY		U(0x0)
 #define SDCR_SPD_DISABLE	U(0x2)
 #define SDCR_SPD_ENABLE		U(0x3)
-#define SDCR_SCCD_BIT		(U(1) << 23)
-#define SDCR_TTRF_BIT		(U(1) << 19)
 #define SDCR_SPME_BIT		(U(1) << 17)
-#define SDCR_RESET_VAL		U(0x0)
+#define SDCR_TTRF_BIT		(U(1) << 19)
+#define SDCR_SCCD_BIT		(U(1) << 23)
 #define SDCR_MTPME_BIT		(U(1) << 28)
+#define SDCR_RESET_VAL		U(0x0)
 
 /* HSCTLR definitions */
 #define HSCTLR_RES1	((U(1) << 29) | (U(1) << 28) | (U(1) << 23) | \
@@ -460,6 +469,10 @@
 #define PMCR_LP_BIT		(U(1) << 7)
 #define PMCR_LC_BIT		(U(1) << 6)
 #define PMCR_DP_BIT		(U(1) << 5)
+#define PMCR_X_BIT		(U(1) << 4)
+#define PMCR_C_BIT		(U(1) << 2)
+#define PMCR_P_BIT		(U(1) << 1)
+#define PMCR_E_BIT		(U(1) << 0)
 #define	PMCR_RESET_VAL		U(0x0)
 
 /*******************************************************************************
@@ -533,6 +546,7 @@
 #define DCISW		p15, 0, c7, c6, 2
 #define CTR		p15, 0, c0, c0, 1
 #define CNTFRQ		p15, 0, c14, c0, 0
+#define ID_MMFR3	p15, 0, c0, c1, 7
 #define ID_MMFR4	p15, 0, c0, c2, 6
 #define ID_DFR0		p15, 0, c0, c1, 2
 #define ID_DFR1		p15, 0, c0, c3, 5
@@ -782,5 +796,6 @@
 #define DSU_CLUSTER_PWR_OFF	0
 #define DSU_CLUSTER_PWR_ON	1
 #define DSU_CLUSTER_PWR_MASK	U(1)
+#define DSU_CLUSTER_MEM_RET	BIT(1)
 
 #endif /* ARCH_H */

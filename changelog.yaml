@@ -24,47 +24,38 @@ sections:
   - title: Build System
     description: Changes that affect the build system or external dependencies
     type: build
-    hidden: true
 
   - title: Continuous Integration
     description: Changes to our CI configuration files and scripts
     type: ci
-    hidden: true
 
   - title: Documentation
     description: Documentation-only changes
     type: docs
-    hidden: true
 
   - title: Performance Improvements
     description: A code change that improves performance
     type: perf
-    hidden: true
 
   - title: Code Refactoring
     description: A code change that neither fixes a bug nor adds a feature
     type: refactor
-    hidden: true
 
   - title: Reverted Changes
     description: Changes that revert a previous change
     type: revert
-    hidden: true
 
   - title: Style
     description: Changes that do not affect the meaning of the code (white-space, formatting, missing semi-colons, etc.)
     type: style
-    hidden: true
 
   - title: Tests
     description: Adding missing tests or correcting existing tests
     type: test
-    hidden: true
 
   - title: Miscellaneous
     description: Any other change
     type: chore
-    hidden: true
 
 #
 # The following block describes the sub-sections of the changelog. These sub-sections may appear in
@@ -150,6 +141,10 @@ subsections:
         scope: trf
 
   - title: Platforms
+    scope: platforms
+
+    deprecated:
+      - plat/common
 
     subsections:
       - title: Allwinner
@@ -180,8 +175,8 @@ subsections:
 
             deprecated:
               - arm_fgpa
-              - arm_fpga
               - plat/arm_fpga
+              - arm/fpga
 
           - title: FVP
             scope: fvp
@@ -244,8 +239,18 @@ subsections:
           - title: Corstone-1000
             scope: corstone-1000
 
+      - title: Aspeed
+        scope: aspeed
+
+        subsections:
+          - title: AST2700
+            scope: ast2700
+
       - title: Broadcom
         scope: brcm
+
+      - title: Cadence
+        scope: cadence
 
       - title: HiSilicon
         scope: hisilicon
@@ -399,6 +404,13 @@ subsections:
               - title: i.MX 8
                 scope: imx8
 
+              - title: i.MX 9
+                scope: imx9
+
+                subsections:
+                  - title: i.MX93
+                    scope: imx93
+
           - title: Layerscape
             scope: layerscape
 
@@ -485,6 +497,9 @@ subsections:
           - title: SBSA
             scope: qemu-sbsa
 
+            deprecated:
+              - qemu_sbsa
+
       - title: QTI
         scope: qti
 
@@ -545,6 +560,9 @@ subsections:
               - rockchip/rk3399
               - rk3399/suspend
 
+          - title: RK3328
+            scope: rk3328
+
       - title: Socionext
         scope: socionext
 
@@ -575,6 +593,9 @@ subsections:
               - title: STM32MP15
                 scope: stm32mp15
 
+          - title: STM32MP2
+            scope: stm32mp2
+
       - title: Texas Instruments
         scope: ti
 
@@ -592,6 +613,9 @@ subsections:
           - plat/xilinx
 
         subsections:
+          - title: DCC (Debug Communication Channel)
+            scope: dcc
+
           - title: Versal
             scope: versal
 
@@ -613,6 +637,13 @@ subsections:
             deprecated:
               - plat/zynqmp
               - plat/xilinx/zynqmp
+
+      - title: Nuvoton
+        scope: nuvoton
+
+        subsections:
+          - title: npcm845x
+            scope: npcm845x
 
   - title: Bootloader Images
     scope: bl
@@ -667,6 +698,9 @@ subsections:
         scope: spm
 
         subsections:
+          - title: EL3 SPM
+            scope: el3-spm
+
           - title: EL3 SPMC
             scope: el3-spmc
 
@@ -685,10 +719,14 @@ subsections:
       - title: TRNG
         scope: trng
 
-      - title: ERRATA_ABI
-        scope: errata_abi
+      - title: ERRATA ABI
+        scope: errata-abi
+
+        deprecated:
+          - errata_abi
 
   - title: Libraries
+    scope: lib
 
     subsections:
       - title: CPU Support
@@ -760,6 +798,9 @@ subsections:
       - title: Semihosting
         scope: semihosting
 
+      - title: Firmware Handoff
+        scope: handoff
+
   - title: Drivers
 
     subsections:
@@ -778,6 +819,9 @@ subsections:
 
           - title: mbedTLS
             scope: mbedtls
+
+          - title: mbedTLS-PSA
+            scope: mbedtls-psa
 
       - title: Console
         scope: console
@@ -874,6 +918,9 @@ subsections:
 
                   - title: GIC-600AE
                     scope: gic600ae
+
+              - title: GICv2
+                scope: gicv2
 
           - title: SMMU
             scope: smmu
@@ -1036,6 +1083,9 @@ subsections:
 
           - title: TZC-380
             scope: nxp-tzc380
+
+          - title: TRDC
+            scope: imx-trdc
 
       - title: Renesas
         scope: renesas-drivers
@@ -1201,6 +1251,9 @@ subsections:
               - title: STM32MP15
                 scope: stm32mp15-fdts
 
+          - title: STM32MP2
+            scope: stm32mp2-fdts
+
       - title: PIE
         scope: pie
 
@@ -1301,6 +1354,9 @@ subsections:
       - title: Certificate Creation Tool
         scope: cert-create
 
+      - title: Memory Mapping Tool
+        scope: memmap
+
         deprecated:
           - cert_create
 
@@ -1322,6 +1378,9 @@ subsections:
 
       - title: Node Package Manager (NPM)
         scope: npm
+
+      - title: Poetry
+        scope: poetry
 
       - title: zlib
         scope: zlib

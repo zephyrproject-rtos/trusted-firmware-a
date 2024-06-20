@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, Arm Limited. All rights reserved.
+ * Copyright (c) 2022-2023, Arm Limited. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -27,7 +27,7 @@ static cert_t cot_certs[] = {
 		.key = ROT_KEY,
 		.issuer = CCA_CONTENT_CERT,
 		.ext = {
-			TRUSTED_FW_NVCOUNTER_EXT,
+			CCA_FW_NVCOUNTER_EXT,
 			SOC_AP_FW_HASH_EXT,
 			SOC_FW_CONFIG_HASH_EXT,
 			RMM_HASH_EXT,
@@ -139,6 +139,17 @@ REGISTER_COT(cot_certs);
 
 /* Certificate extensions. */
 static ext_t cot_ext[] = {
+	[CCA_FW_NVCOUNTER_EXT] = {
+		.oid = CCA_FW_NVCOUNTER_OID,
+		.opt = "ccafw-nvctr",
+		.help_msg = "CCA Firmware Non-Volatile counter value",
+		.sn = "CCANVCounter",
+		.ln = "CCA Non-Volatile counter",
+		.asn1_type = V_ASN1_INTEGER,
+		.type = EXT_TYPE_NVCOUNTER,
+		.attr.nvctr_type = NVCTR_TYPE_CCAFW
+	},
+
 	[TRUSTED_FW_NVCOUNTER_EXT] = {
 		.oid = TRUSTED_FW_NVCOUNTER_OID,
 		.opt = "tfw-nvctr",
@@ -403,35 +414,35 @@ static key_t cot_keys[] = {
 	[ROT_KEY] = {
 		.id = ROT_KEY,
 		.opt = "rot-key",
-		.help_msg = "Root Of Trust key (input/output file)",
+		.help_msg = "Root Of Trust key file or PKCS11 URI",
 		.desc = "Root Of Trust key"
 	},
 
 	[SWD_ROT_KEY] = {
 		.id = SWD_ROT_KEY,
 		.opt = "swd-rot-key",
-		.help_msg = "Secure World Root of Trust key",
+		.help_msg = "Secure World Root of Trust key file or PKCS11 URI",
 		.desc = "Secure World Root of Trust key"
 	},
 
 	[CORE_SWD_KEY] = {
 		.id = CORE_SWD_KEY,
 		.opt = "core-swd-key",
-		.help_msg = "Core Secure World key",
+		.help_msg = "Core Secure World key file or PKCS11 URI",
 		.desc = "Core Secure World key"
 	},
 
 	[PROT_KEY] = {
 		.id = PROT_KEY,
 		.opt = "prot-key",
-		.help_msg = "Platform Root of Trust key",
+		.help_msg = "Platform Root of Trust key file or PKCS11 URI",
 		.desc = "Platform Root of Trust key"
 	},
 
 	[PLAT_KEY] = {
 		.id = PLAT_KEY,
 		.opt = "plat-key",
-		.help_msg = "Platform key",
+		.help_msg = "Platform key file or PKCS11 URI",
 		.desc = "Platform key"
 	},
 };

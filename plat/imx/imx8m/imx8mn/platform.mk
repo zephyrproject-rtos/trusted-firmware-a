@@ -31,8 +31,10 @@ BL31_SOURCES		+=	plat/imx/common/imx8_helpers.S			\
 				plat/imx/imx8m/imx_aipstz.c			\
 				plat/imx/imx8m/imx_rdc.c			\
 				plat/imx/imx8m/imx8m_caam.c			\
+				plat/imx/imx8m/imx8m_ccm.c			\
 				plat/imx/imx8m/imx8m_csu.c			\
 				plat/imx/imx8m/imx8m_psci_common.c		\
+				plat/imx/imx8m/imx8m_snvs.c			\
 				plat/imx/imx8m/imx8mn/imx8mn_bl31_setup.c	\
 				plat/imx/imx8m/imx8mn/imx8mn_psci.c		\
 				plat/imx/imx8m/imx8mn/gpc.c			\
@@ -64,6 +66,9 @@ BL32_SIZE		?=	0x2000000
 $(eval $(call add_define,BL32_SIZE))
 
 IMX_BOOT_UART_BASE	?=	0x30890000
+ifeq (${IMX_BOOT_UART_BASE},auto)
+    override IMX_BOOT_UART_BASE	:=	0
+endif
 $(eval $(call add_define,IMX_BOOT_UART_BASE))
 
 EL3_EXCEPTION_HANDLING := $(SDEI_SUPPORT)

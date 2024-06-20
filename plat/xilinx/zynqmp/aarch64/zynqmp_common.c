@@ -13,11 +13,12 @@
 #include <lib/mmio.h>
 #include <lib/smccc.h>
 #include <lib/xlat_tables/xlat_tables.h>
+#include <plat/common/platform.h>
+#include <services/arm_arch_svc.h>
+
 #include <plat_ipi.h>
 #include <plat_private.h>
 #include <plat_startup.h>
-#include <plat/common/platform.h>
-#include <services/arm_arch_svc.h>
 
 #include "zynqmp_pm_api_sys.h"
 
@@ -26,12 +27,17 @@
  * This doesn't include TZRAM as the 'mem_layout' argument passed to
  * configure_mmu_elx() will give the available subset of that,
  */
-const mmap_region_t plat_arm_mmap[] = {
+const mmap_region_t plat_zynqmp_mmap[] = {
 	{ DEVICE0_BASE, DEVICE0_BASE, DEVICE0_SIZE, MT_DEVICE | MT_RW | MT_SECURE },
 	{ DEVICE1_BASE, DEVICE1_BASE, DEVICE1_SIZE, MT_DEVICE | MT_RW | MT_SECURE },
 	{ CRF_APB_BASE, CRF_APB_BASE, CRF_APB_SIZE, MT_DEVICE | MT_RW | MT_SECURE },
 	{0}
 };
+
+const mmap_region_t *plat_get_mmap(void)
+{
+	return plat_zynqmp_mmap;
+}
 
 static uint32_t zynqmp_get_silicon_ver(void)
 {
@@ -47,7 +53,7 @@ static uint32_t zynqmp_get_silicon_ver(void)
 	return ver;
 }
 
-uint32_t zynqmp_get_uart_clk(void)
+uint32_t get_uart_clk(void)
 {
 	unsigned int ver = zynqmp_get_silicon_ver();
 
@@ -60,11 +66,11 @@ uint32_t zynqmp_get_uart_clk(void)
 
 #if LOG_LEVEL >= LOG_LEVEL_NOTICE
 static const struct {
-	uint32_t id;
-	uint32_t ver;
-	char *name;
+	uint8_t id;
 	bool evexists;
-} zynqmp_devices[] = {
+	uint16_t ver;
+	char *name;
+} __packed zynqmp_devices[] = {
 	{
 		.id = 0x10,
 		.name = "XCZU3EG",
@@ -228,20 +234,9 @@ static char *zynqmp_get_silicon_idcode_name(void)
 	size_t i, j, len;
 	const char *name = "EG/EV";
 
-#ifdef IMAGE_BL32
-	/*
-	 * For BL32, get the chip id info directly by reading corresponding
-	 * registers instead of making pm call. This has limitation
-	 * that these registers should be configured to have access
-	 * from APU which is default case.
-	 */
-	chipid[0] = mmio_read_32(ZYNQMP_CSU_BASEADDR + ZYNQMP_CSU_IDCODE_OFFSET);
-	chipid[1] = mmio_read_32(EFUSE_BASEADDR + EFUSE_IPDISABLE_OFFSET);
-#else
 	if (pm_get_chipid(chipid) != PM_RET_SUCCESS) {
 		return "XCZUUNKN";
 	}
-#endif
 
 	id = chipid[0] & (ZYNQMP_CSU_IDCODE_DEVICE_CODE_MASK |
 			  ZYNQMP_CSU_IDCODE_SVD_MASK);

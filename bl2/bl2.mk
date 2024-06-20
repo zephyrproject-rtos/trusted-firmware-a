@@ -41,16 +41,15 @@ else
 BL2_SOURCES		+=	bl2/${ARCH}/bl2_el3_entrypoint.S	\
 				bl2/${ARCH}/bl2_el3_exceptions.S	\
 				bl2/${ARCH}/bl2_run_next_image.S        \
-				lib/cpus/${ARCH}/cpu_helpers.S		\
-				lib/cpus/errata_report.c
-
-ifeq (${DISABLE_MTPMU},1)
-BL2_SOURCES		+=	lib/extensions/mtpmu/${ARCH}/mtpmu.S
-endif
+				lib/cpus/${ARCH}/cpu_helpers.S
 
 ifeq (${ARCH},aarch64)
 BL2_SOURCES		+=	lib/cpus/aarch64/dsu_helpers.S
 endif
 
 BL2_DEFAULT_LINKER_SCRIPT_SOURCE := bl2/bl2_el3.ld.S
+endif
+
+ifeq (${ENABLE_PMF},1)
+BL2_SOURCES		+=	lib/pmf/pmf_main.c
 endif

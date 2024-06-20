@@ -540,6 +540,7 @@ static int ufs_prepare_query(utp_utrd_t *utrd, uint8_t op, uint8_t idn,
 
 	query_upiu->trans_type = QUERY_REQUEST_UPIU;
 	query_upiu->task_tag = utrd->task_tag;
+	query_upiu->data_segment_len = htobe16(length);
 	query_upiu->ts.desc.opcode = op;
 	query_upiu->ts.desc.idn = idn;
 	query_upiu->ts.desc.index = index;
@@ -608,7 +609,7 @@ static void ufs_send_request(int task_tag)
 	       UTRIACR_IATOVAL(0xFF);
 	mmio_write_32(ufs_params.reg_base + UTRIACR, data);
 	/* send request */
-	mmio_setbits_32(ufs_params.reg_base + UTRLDBR, 1 << slot);
+	mmio_setbits_32(ufs_params.reg_base + UTRLDBR, 1U << slot);
 }
 
 static int ufs_check_resp(utp_utrd_t *utrd, int trans_type, unsigned int timeout_ms)

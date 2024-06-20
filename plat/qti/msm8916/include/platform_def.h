@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, Stephan Gerhold <stephan@gerhold.net>
+ * Copyright (c) 2021-2023, Stephan Gerhold <stephan@gerhold.net>
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -8,6 +8,7 @@
 
 #include <plat/common/common_def.h>
 
+#ifdef __aarch64__
 /*
  * There is at least 1 MiB available for BL31. However, at the moment the
  * "msm8916_entry_point" variable in the data section is read through the
@@ -18,15 +19,26 @@
  */
 #define BL31_LIMIT			(BL31_BASE + SZ_128K)
 #define BL31_PROGBITS_LIMIT		(BL31_BASE + SZ_64K)
+#endif
+#define BL32_LIMIT			(BL32_BASE + SZ_128K)
 
 #define CACHE_WRITEBACK_GRANULE		U(64)
 #define PLATFORM_STACK_SIZE		SZ_4K
 
-/* CPU topology: single cluster with 4 cores */
+/* CPU topology: one or two clusters with 4 cores each */
+#ifdef PLAT_msm8939
+#define PLATFORM_CLUSTER_COUNT		U(2)
+#else
 #define PLATFORM_CLUSTER_COUNT		U(1)
-#define PLATFORM_MAX_CPUS_PER_CLUSTER	U(4)
+#endif
+#if defined(PLAT_mdm9607)
+#define PLATFORM_CPU_PER_CLUSTER_SHIFT	U(0)	/* 1 */
+#else
+#define PLATFORM_CPU_PER_CLUSTER_SHIFT	U(2)	/* 4 */
+#endif
+#define PLATFORM_CPUS_PER_CLUSTER	(1 << PLATFORM_CPU_PER_CLUSTER_SHIFT)
 #define PLATFORM_CORE_COUNT		(PLATFORM_CLUSTER_COUNT * \
-					 PLATFORM_MAX_CPUS_PER_CLUSTER)
+					 PLATFORM_CPUS_PER_CLUSTER)
 
 /* Power management */
 #define PLATFORM_SYSTEM_COUNT		U(1)
@@ -44,8 +56,9 @@
 #define PLAT_PHY_ADDR_SPACE_SIZE	(ULL(1) << 32)
 #define PLAT_VIRT_ADDR_SPACE_SIZE	(ULL(1) << 32)
 
-/* Timer frequency */
+/* Timer */
 #define PLAT_SYSCNT_FREQ		19200000
+#define IRQ_SEC_PHY_TIMER		(16 + 2)	/* PPI #2 */
 
 /*
  * The Qualcomm QGIC2 implementation seems to have PIDR0-4 and PIDR4-7
@@ -53,5 +66,10 @@
  * Override the address in <drivers/arm/gicv2.h> to avoid a failing assert().
  */
 #define GICD_PIDR2_GICV2		U(0xFD8)
+
+/* TSP */
+#define TSP_IRQ_SEC_PHY_TIMER		IRQ_SEC_PHY_TIMER
+#define TSP_SEC_MEM_BASE		BL32_BASE
+#define TSP_SEC_MEM_SIZE		(BL32_LIMIT - BL32_BASE)
 
 #endif /* PLATFORM_DEF_H */

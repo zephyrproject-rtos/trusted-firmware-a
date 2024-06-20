@@ -199,7 +199,7 @@
 #define QEMU_FLASH1_BASE		0x10000000
 #define QEMU_FLASH1_SIZE		0x10000000
 
-#define PLAT_QEMU_FIP_BASE		0x00008000
+#define PLAT_QEMU_FIP_BASE		BL1_SIZE
 #define PLAT_QEMU_FIP_MAX_SIZE		0x00400000
 
 /* This is map from GIC_DIST up to last CPU (255) GIC_REDISTR */
@@ -215,6 +215,8 @@
 /*
  * GIC related constants
  * We use GICv3 where CPU Interface registers are not memory mapped
+ *
+ * Legacy values - on platform version 0.1+ they are read from DT
  */
 #define GICD_BASE			0x40060000
 #define GICR_BASE			0x40080000

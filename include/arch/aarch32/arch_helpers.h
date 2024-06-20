@@ -8,6 +8,7 @@
 #ifndef ARCH_HELPERS_H
 #define ARCH_HELPERS_H
 
+#include <assert.h>
 #include <cdefs.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -217,8 +218,10 @@ DEFINE_SYSREG_RW_FUNCS(cpsr)
  ******************************************************************************/
 DEFINE_COPROCR_READ_FUNC(mpidr, MPIDR)
 DEFINE_COPROCR_READ_FUNC(midr, MIDR)
+DEFINE_COPROCR_READ_FUNC(id_mmfr3, ID_MMFR3)
 DEFINE_COPROCR_READ_FUNC(id_mmfr4, ID_MMFR4)
 DEFINE_COPROCR_READ_FUNC(id_dfr0, ID_DFR0)
+DEFINE_COPROCR_READ_FUNC(id_dfr1, ID_DFR1)
 DEFINE_COPROCR_READ_FUNC(id_pfr0, ID_PFR0)
 DEFINE_COPROCR_READ_FUNC(id_pfr1, ID_PFR1)
 DEFINE_COPROCR_READ_FUNC(isr, ISR)
@@ -288,7 +291,7 @@ DEFINE_COPROCR_WRITE_FUNC_64(icc_asgi1r, ICC_ASGI1R_EL1_64)
 DEFINE_COPROCR_RW_FUNCS(sdcr, SDCR)
 DEFINE_COPROCR_RW_FUNCS(hdcr, HDCR)
 DEFINE_COPROCR_RW_FUNCS(cnthp_ctl, CNTHP_CTL)
-DEFINE_COPROCR_READ_FUNC(pmcr, PMCR)
+DEFINE_COPROCR_RW_FUNCS(pmcr, PMCR)
 
 /*
  * Address translation
@@ -350,6 +353,17 @@ DEFINE_DCOP_PARAM_FUNC(cvac, DCCMVAC)
  * DynamIQ Shared Unit power management
  */
 DEFINE_COPROCR_RW_FUNCS(clusterpwrdn, CLUSTERPWRDN)
+
+/*
+ * RNDR is AArch64 only, so just provide a placeholder here to make the
+ * linker happy.
+ */
+static inline u_register_t read_rndr(void)
+{
+	assert(1);
+
+	return 0;
+}
 
 /* Previously defined accessor functions with incomplete register names  */
 #define dsb()			dsbsy()

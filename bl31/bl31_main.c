@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2022, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2013-2023, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -17,6 +17,7 @@
 #include <common/feat_detect.h>
 #include <common/runtime_svc.h>
 #include <drivers/console.h>
+#include <lib/bootmarker_capture.h>
 #include <lib/el3_runtime/context_mgmt.h>
 #include <lib/pmf/pmf.h>
 #include <lib/runtime_instr.h>
@@ -24,8 +25,13 @@
 #include <services/std_svc.h>
 
 #if ENABLE_RUNTIME_INSTRUMENTATION
-PMF_REGISTER_SERVICE_SMC(rt_instr_svc, PMF_RT_INSTR_SVC_ID,
-	RT_INSTR_TOTAL_IDS, PMF_STORE_ENABLE)
+	PMF_REGISTER_SERVICE_SMC(rt_instr_svc, PMF_RT_INSTR_SVC_ID,
+		RT_INSTR_TOTAL_IDS, PMF_STORE_ENABLE)
+#endif
+
+#if ENABLE_RUNTIME_INSTRUMENTATION
+	PMF_REGISTER_SERVICE(bl_svc, PMF_RT_INSTR_SVC_ID,
+		BL_TOTAL_IDS, PMF_DUMP_ENABLE)
 #endif
 
 /*******************************************************************************
@@ -112,6 +118,12 @@ void bl31_setup(u_register_t arg0, u_register_t arg1, u_register_t arg2,
  ******************************************************************************/
 void bl31_main(void)
 {
+	/* Init registers that never change for the lifetime of TF-A */
+	cm_manage_extensions_el3();
+
+	/* Init per-world context registers for non-secure world */
+	manage_extensions_nonsecure_per_world();
+
 	NOTICE("BL31: %s\n", version_string);
 	NOTICE("BL31: %s\n", build_message);
 
@@ -119,6 +131,10 @@ void bl31_main(void)
 	/* Detect if features enabled during compilation are supported by PE. */
 	detect_arch_features();
 #endif /* FEATURE_DETECTION */
+
+#if ENABLE_RUNTIME_INSTRUMENTATION
+	PMF_CAPTURE_TIMESTAMP(bl_svc, BL31_ENTRY, PMF_CACHE_MAINT);
+#endif
 
 #ifdef SUPPORT_UNKNOWN_MPID
 	if (unsupported_mpid_flag == 0) {
@@ -160,6 +176,7 @@ void bl31_main(void)
 	if (bl32_init != NULL) {
 		INFO("BL31: Initializing BL32\n");
 
+		console_flush();
 		int32_t rc = (*bl32_init)();
 
 		if (rc == 0) {
@@ -175,6 +192,7 @@ void bl31_main(void)
 	if (rmm_init != NULL) {
 		INFO("BL31: Initializing RMM\n");
 
+		console_flush();
 		int32_t rc = (*rmm_init)();
 
 		if (rc == 0) {
@@ -196,6 +214,11 @@ void bl31_main(void)
 	 * from BL31
 	 */
 	bl31_plat_runtime_setup();
+
+#if ENABLE_RUNTIME_INSTRUMENTATION
+	PMF_CAPTURE_TIMESTAMP(bl_svc, BL31_EXIT, PMF_CACHE_MAINT);
+	console_flush();
+#endif
 }
 
 /*******************************************************************************

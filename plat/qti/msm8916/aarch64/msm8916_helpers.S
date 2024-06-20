@@ -6,10 +6,15 @@
 
 #include <arch.h>
 #include <asm_macros.S>
+#include <platform_def.h>
 
 #include <msm8916_mmap.h>
 
+#if PLATFORM_CORE_COUNT > 1
 #define APCS_TCM_START_ADDR	0x10
+#else
+#define APCS_TCM_START_ADDR	0x34
+#endif
 #define APCS_TCM_REDIRECT_EN_0	BIT_32(0)
 
 	.globl	plat_crash_console_init
@@ -30,7 +35,7 @@
 	 * -------------------------------------------------
 	 */
 func plat_crash_console_init
-	mov	x1, #BLSP_UART2_BASE
+	mov_imm	x1, BLSP_UART_BASE
 	mov	x0, #1
 	b	console_uartdm_core_init
 endfunc plat_crash_console_init
@@ -44,7 +49,7 @@ endfunc plat_crash_console_init
 	 * -------------------------------------------------
 	 */
 func plat_crash_console_putc
-	mov	x1, #BLSP_UART2_BASE
+	mov_imm	x1, BLSP_UART_BASE
 	b	console_uartdm_core_putc
 endfunc plat_crash_console_putc
 
@@ -56,7 +61,7 @@ endfunc plat_crash_console_putc
 	 * -------------------------------------------------
 	 */
 func plat_crash_console_flush
-	mov	x1, #BLSP_UART2_BASE
+	mov_imm	x1, BLSP_UART_BASE
 	b	console_uartdm_core_flush
 endfunc plat_crash_console_flush
 
@@ -78,9 +83,18 @@ endfunc plat_panic_handler
 	 * -------------------------------------------------
 	 */
 func plat_my_core_pos
-	/* There is just a single cluster so this is very simple */
-	mrs	x0, mpidr_el1
-	and	x0, x0, #MPIDR_CPU_MASK
+	.if PLATFORM_CORE_COUNT > 1
+		mrs	x1, mpidr_el1
+		and	x0, x1, #MPIDR_CPU_MASK
+		.if PLATFORM_CLUSTER_COUNT > 1
+			and	x1, x1, #MPIDR_CLUSTER_MASK
+			orr	x0, x0, x1, LSR #(MPIDR_AFFINITY_BITS - \
+						  PLATFORM_CPU_PER_CLUSTER_SHIFT)
+		.endif
+	.else
+		/* There is just a single core so always 0 */
+		mov	x0, #0
+	.endif
 	ret
 endfunc plat_my_core_pos
 
@@ -93,43 +107,42 @@ endfunc plat_my_core_pos
 	 */
 func plat_get_my_entrypoint
 	ldr	x0, msm8916_entry_point
+	cbz	x0, 1f
+	ret
+1:
+	/*
+	 * Cold boot: Disable TCM redirect to L2 cache as early as
+	 * possible to avoid crashes when making use of the cache.
+	 */
+	mov_imm	x1, APCS_CFG(0)
+	ldr	w2, [x1, #APCS_TCM_START_ADDR]
+	and	w2, w2, #~APCS_TCM_REDIRECT_EN_0
+	str	w2, [x1, #APCS_TCM_START_ADDR]
+
+	/*
+	 * After reset the CPU always starts executing at the fixed reset
+	 * address (0x0), which does not match the link address of BL31.
+	 * The "boot remapper" redirects all memory accesses to the real
+	 * physical address in DRAM.
+	 *
+	 * For warm boots, this is already handled by loading the real
+	 * entry point address above.
+	 *
+	 * For cold boots, check if the CPU is using the boot remapper,
+	 * i.e. if bl31_entrypoint appears to be at the reset address (0x0).
+	 */
+	adr	x1, bl31_entrypoint
+	cbnz	x1, 2f
+
+	/*
+	 * Add the real BL31_BASE offset to the return address in the link
+	 * register so the CPU will continue at the real address after return.
+	 */
+	mov_imm	x1, BL31_BASE
+	add	lr, lr, x1
+2:
 	ret
 endfunc plat_get_my_entrypoint
-
-	/* -------------------------------------------------
-	 * void plat_reset_handler(void)
-	 * Perform additional initialization after reset.
-	 * Clobber list : x0 - x18, x30
-	 * -------------------------------------------------
-	 */
-func plat_reset_handler
-	/*
-	 * Check if the CPU is running at the correct address.
-	 * During cold boot the CPU enters here at the wrong address
-	 * using the "boot remapper". (It remaps the BL31_BASE to
-	 * the CPU reset address 0x0).
-	 */
-	mov	x0, #BL31_BASE
-	adr	x1, bl31_entrypoint
-	cmp	x0, x1
-	b.ne	_remapped_cold_boot
-	/* Already running at correct address, just return directly */
-	ret
-
-_remapped_cold_boot:
-	/*
-	 * The previous boot stage seems to use the L2 cache as TCM.
-	 * Disable the TCM redirect before enabling caches to avoid
-	 * strange crashes.
-	 */
-	mov	x2, #APCS_CFG
-	ldr	w3, [x2, #APCS_TCM_START_ADDR]
-	and	w3, w3, #~APCS_TCM_REDIRECT_EN_0
-	str	w3, [x2, #APCS_TCM_START_ADDR]
-
-	/* Enter BL31 again at the real address */
-	br	x0
-endfunc plat_reset_handler
 
 	/* -------------------------------------------------
 	 * void platform_mem_init(void)

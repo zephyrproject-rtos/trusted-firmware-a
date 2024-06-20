@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2022, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2013-2023, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -451,8 +451,8 @@ void psci_get_target_local_pwr_states(unsigned int end_pwrlvl,
  * enter. This function will be called after coordination of requested power
  * states has been done for each power level.
  *****************************************************************************/
-static void psci_set_target_local_pwr_states(unsigned int end_pwrlvl,
-					const psci_power_state_t *target_state)
+void psci_set_target_local_pwr_states(unsigned int end_pwrlvl,
+				      const psci_power_state_t *target_state)
 {
 	unsigned int parent_idx, lvl;
 	const plat_local_state_t *pd_state = target_state->pwr_domain_state;
@@ -473,7 +473,6 @@ static void psci_set_target_local_pwr_states(unsigned int end_pwrlvl,
 		parent_idx = psci_non_cpu_pd_nodes[parent_idx].parent_node;
 	}
 }
-
 
 /*******************************************************************************
  * PSCI helper function to get the parent nodes corresponding to a cpu_index.
@@ -595,9 +594,6 @@ void psci_do_state_coordination(unsigned int end_pwrlvl,
 		state_info->pwr_domain_state[lvl] = PSCI_LOCAL_STATE_RUN;
 
 	}
-
-	/* Update the target state in the power domain nodes */
-	psci_set_target_local_pwr_states(end_pwrlvl, state_info);
 }
 
 #if PSCI_OS_INIT_MODE
@@ -683,9 +679,6 @@ exit:
 		psci_restore_req_local_pwr_states(cpu_idx, prev);
 		return rc;
 	}
-
-	/* Update the target state in the power domain nodes */
-	psci_set_target_local_pwr_states(end_pwrlvl, state_info);
 
 	return rc;
 }
@@ -822,20 +815,6 @@ void psci_release_pwr_domain_locks(unsigned int end_pwrlvl,
 		parent_idx = parent_nodes[level - 1U];
 		psci_lock_release(&psci_non_cpu_pd_nodes[parent_idx]);
 	}
-}
-
-/*******************************************************************************
- * Simple routine to determine whether a mpidr is valid or not.
- ******************************************************************************/
-int psci_validate_mpidr(u_register_t mpidr)
-{
-	int pos = plat_core_pos_by_mpidr(mpidr);
-
-	if ((pos < 0) || ((unsigned int)pos >= PLATFORM_CORE_COUNT)) {
-		return PSCI_E_INVALID_PARAMS;
-	}
-
-	return PSCI_E_SUCCESS;
 }
 
 /*******************************************************************************
@@ -992,6 +971,9 @@ void psci_warmboot_entrypoint(void)
 	unsigned int parent_nodes[PLAT_MAX_PWR_LVL] = {0};
 	psci_power_state_t state_info = { {PSCI_LOCAL_STATE_RUN} };
 
+	/* Init registers that never change for the lifetime of TF-A */
+	cm_manage_extensions_el3();
+
 	/*
 	 * Verify that we have been explicitly turned ON or resumed from
 	 * suspend.
@@ -1039,6 +1021,13 @@ void psci_warmboot_entrypoint(void)
 		psci_cpu_on_finish(cpu_idx, &state_info);
 	else
 		psci_cpu_suspend_finish(cpu_idx, &state_info);
+
+	/*
+	 * Generic management: Now we just need to retrieve the
+	 * information that we had stashed away during the cpu_on
+	 * call to set this cpu on its way.
+	 */
+	cm_prepare_el3_exit_ns();
 
 	/*
 	 * Set the requested and target state of this CPU and all the higher

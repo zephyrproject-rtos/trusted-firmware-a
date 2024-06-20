@@ -25,6 +25,18 @@ issues found, additional release candidates may be created to fix the issues.
          code freeze       ver w.x       code freeze     ver y.z
 
 
+Version numbering
+~~~~~~~~~~~~~~~~~
+TF-A version is given in Makefile, through several macros:
+
+- VERSION_MAJOR
+- VERSION_MINOR
+- VERSION_PATCH
+
+For example, TF-A v2.10 has VERSION_MAJOR=2, VERSION_MINOR=10 and VERSION_PATCH=0.
+
+This VERSION_PATCH macro is only increased for LTS releases.
+
 Upcoming Releases
 ~~~~~~~~~~~~~~~~~
 
@@ -54,7 +66,7 @@ depending on project requirement and partner feedback.
 +-----------------+---------------------------+------------------------------+
 | v2.9            | 4th week of May '23       | 2nd week of May '23          |
 +-----------------+---------------------------+------------------------------+
-| v3.0            | 2nd week of Nov '23       | 2nd week of Oct '23          |
+| v2.10           | 4th week of Nov '23       | 2nd week of Nov '23          |
 +-----------------+---------------------------+------------------------------+
 
 Removal of Deprecated Interfaces
@@ -69,7 +81,9 @@ after which it will be removed.
 |                                | Date        | after   |                                                         |
 |                                |             | Release |                                                         |
 +================================+=============+=========+=========================================================+
-| None at this time              |             |         |                                                         |
+| Mbedtls-2.x                    |     2.10    |   2.10  | Support for TF-A builds with Mbedtls-2.x will be removed|
++--------------------------------+-------------+---------+---------------------------------------------------------+
+| STM32MP15_OPTEE_RSV_SHM        |     2.10    |   3.0   | OP-TEE manages its own memory on STM32MP15              |
 +--------------------------------+-------------+---------+---------------------------------------------------------+
 
 Removal of Deprecated Drivers
@@ -84,9 +98,7 @@ after which it will be removed.
 |                                | Date        | after   |                                                         |
 |                                |             | Release |                                                         |
 +================================+=============+=========+=========================================================+
-| CryptoCell-712                 |     2.9     |   3.0   | No longer maintained.                                   |
-+--------------------------------+-------------+---------+---------------------------------------------------------+
-| CryptoCell-713                 |     2.9     |   3.0   | No longer maintained.                                   |
+| None at this time.             |             |         |                                                         |
 +--------------------------------+-------------+---------+---------------------------------------------------------+
 
 --------------

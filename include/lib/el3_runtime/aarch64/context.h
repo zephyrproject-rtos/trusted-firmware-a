@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2022, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2013-2023, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -7,6 +7,7 @@
 #ifndef CONTEXT_H
 #define CONTEXT_H
 
+#include <lib/el3_runtime/cpu_data.h>
 #include <lib/utils_def.h>
 
 /*******************************************************************************
@@ -61,9 +62,23 @@
 #define CTX_ELR_EL3		U(0x20)
 #define CTX_PMCR_EL0		U(0x28)
 #define CTX_IS_IN_EL3		U(0x30)
-#define CTX_CPTR_EL3		U(0x38)
-#define CTX_ZCR_EL3		U(0x40)
-#define CTX_EL3STATE_END	U(0x50) /* Align to the next 16 byte boundary */
+#define CTX_MPAM3_EL3		U(0x38)
+/* Constants required in supporting nested exception in EL3 */
+#define CTX_SAVED_ELR_EL3	U(0x40)
+/*
+ * General purpose flag, to save various EL3 states
+ * FFH mode : Used to identify if handling nested exception
+ * KFH mode : Used as counter value
+ */
+#define CTX_NESTED_EA_FLAG	U(0x48)
+#if FFH_SUPPORT
+ #define CTX_SAVED_ESR_EL3	U(0x50)
+ #define CTX_SAVED_SPSR_EL3	U(0x58)
+ #define CTX_SAVED_GPREG_LR	U(0x60)
+ #define CTX_EL3STATE_END	U(0x70) /* Align to the next 16 byte boundary */
+#else
+ #define CTX_EL3STATE_END	U(0x50) /* Align to the next 16 byte boundary */
+#endif
 
 /*******************************************************************************
  * Constants that allow assembler code to access members of and the
@@ -323,6 +338,13 @@
 #define CTX_PAUTH_REGS_END	U(0)
 #endif /* CTX_INCLUDE_PAUTH_REGS */
 
+/*******************************************************************************
+ * Registers initialised in a per-world context.
+ ******************************************************************************/
+#define CTX_CPTR_EL3		U(0x0)
+#define CTX_ZCR_EL3		U(0x8)
+#define CTX_GLOBAL_EL3STATE_END	U(0x10)
+
 #ifndef __ASSEMBLER__
 
 #include <stdint.h>
@@ -433,6 +455,17 @@ typedef struct cpu_context {
 #endif
 } cpu_context_t;
 
+/*
+ * Per-World Context.
+ * It stores registers whose values can be shared across CPUs.
+ */
+typedef struct per_world_context {
+	uint64_t ctx_cptr_el3;
+	uint64_t ctx_zcr_el3;
+} per_world_context_t;
+
+extern per_world_context_t per_world_context[CPU_DATA_CONTEXT_NUM];
+
 /* Macros to access members of the 'cpu_context_t' structure */
 #define get_el3state_ctx(h)	(&((cpu_context_t *) h)->el3state_ctx)
 #if CTX_INCLUDE_FPREGS
@@ -515,15 +548,6 @@ CASSERT(CTX_PAUTH_REGS_OFFSET == __builtin_offsetof(cpu_context_t, pauth_ctx),
  ******************************************************************************/
 void el1_sysregs_context_save(el1_sysregs_t *regs);
 void el1_sysregs_context_restore(el1_sysregs_t *regs);
-
-#if CTX_INCLUDE_EL2_REGS
-void el2_sysregs_context_save_common(el2_sysregs_t *regs);
-void el2_sysregs_context_restore_common(el2_sysregs_t *regs);
-#if CTX_INCLUDE_MTE_REGS
-void el2_sysregs_context_save_mte(el2_sysregs_t *regs);
-void el2_sysregs_context_restore_mte(el2_sysregs_t *regs);
-#endif /* CTX_INCLUDE_MTE_REGS */
-#endif /* CTX_INCLUDE_EL2_REGS */
 
 #if CTX_INCLUDE_FPREGS
 void fpregs_context_save(fp_regs_t *regs);

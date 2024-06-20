@@ -21,9 +21,14 @@ $(info MBEDTLS_VERSION_MAJOR is [${MBEDTLS_MAJOR}] MBEDTLS_VERSION_MINOR is [${M
 
 # Specify mbed TLS configuration file
 ifeq (${MBEDTLS_MAJOR}, 2)
-	MBEDTLS_CONFIG_FILE	?=	"<drivers/auth/mbedtls/mbedtls_config-2.h>"
+        $(info Deprecation Notice: Please migrate to Mbedtls version 3.x (refer to TF-A documentation for the exact version number))
+	MBEDTLS_CONFIG_FILE             ?=	"<drivers/auth/mbedtls/mbedtls_config-2.h>"
 else ifeq (${MBEDTLS_MAJOR}, 3)
-	MBEDTLS_CONFIG_FILE	?=	"<drivers/auth/mbedtls/mbedtls_config-3.h>"
+	ifeq (${PSA_CRYPTO},1)
+		MBEDTLS_CONFIG_FILE     ?=      "<drivers/auth/mbedtls/psa_mbedtls_config.h>"
+	else
+		MBEDTLS_CONFIG_FILE	?=	"<drivers/auth/mbedtls/mbedtls_config-3.h>"
+	endif
 endif
 
 $(eval $(call add_define,MBEDTLS_CONFIG_FILE))
@@ -77,6 +82,18 @@ else ifeq (${MBEDTLS_MAJOR}, 3)
 	LIBMBEDTLS_CFLAGS += -Wno-error=redundant-decls
 endif
 
+ifeq (${PSA_CRYPTO},1)
+LIBMBEDTLS_SRCS         += $(addprefix ${MBEDTLS_DIR}/library/,    	\
+					psa_crypto.c                   	\
+					psa_crypto_client.c            	\
+					psa_crypto_driver_wrappers.c   	\
+					psa_crypto_hash.c              	\
+					psa_crypto_rsa.c               	\
+					psa_crypto_ecp.c               	\
+					psa_crypto_slot_management.c   	\
+					)
+endif
+
 # The platform may define the variable 'TF_MBEDTLS_KEY_ALG' to select the key
 # algorithm to use. If the variable is not defined, select it based on
 # algorithm used for key generation `KEY_ALG`. If `KEY_ALG` is not defined,
@@ -91,11 +108,21 @@ endif
 
 ifeq (${TF_MBEDTLS_KEY_SIZE},)
     ifneq ($(findstring rsa,${TF_MBEDTLS_KEY_ALG}),)
-	ifeq (${KEY_SIZE},)
+        ifeq (${KEY_SIZE},)
             TF_MBEDTLS_KEY_SIZE		:=	2048
-	else
+        else ifneq ($(filter $(KEY_SIZE), 1024 2048 3072 4096),)
             TF_MBEDTLS_KEY_SIZE		:=	${KEY_SIZE}
-	endif
+        else
+            $(error "Invalid value for KEY_SIZE: ${KEY_SIZE}")
+        endif
+    else ifneq ($(findstring ecdsa,${TF_MBEDTLS_KEY_ALG}),)
+        ifeq (${KEY_SIZE},)
+            TF_MBEDTLS_KEY_SIZE		:=	256
+        else ifneq ($(filter $(KEY_SIZE), 256 384),)
+            TF_MBEDTLS_KEY_SIZE		:=	${KEY_SIZE}
+        else
+            $(error "Invalid value for KEY_SIZE: ${KEY_SIZE}")
+        endif
     endif
 endif
 

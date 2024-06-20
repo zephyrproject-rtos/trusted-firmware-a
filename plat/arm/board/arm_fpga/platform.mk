@@ -33,7 +33,16 @@ $(eval $(call add_define,FPGA_PRELOADED_DTB_BASE))
 FPGA_PRELOADED_CMD_LINE := 0x1000
 $(eval $(call add_define,FPGA_PRELOADED_CMD_LINE))
 
-ENABLE_FEAT_AMU		:=	2
+ENABLE_BRBE_FOR_NS		:= 2
+ENABLE_TRBE_FOR_NS		:= 2
+ENABLE_FEAT_AMU			:= 2
+ENABLE_FEAT_AMUv1p1		:= 2
+ENABLE_FEAT_CSV2_2		:= 2
+ENABLE_FEAT_ECV			:= 2
+ENABLE_FEAT_FGT			:= 2
+ENABLE_FEAT_HCX			:= 2
+ENABLE_SYS_REG_TRACE_FOR_NS	:= 2
+ENABLE_TRF_FOR_NS		:= 2
 
 # Treating this as a memory-constrained port for now
 USE_COHERENT_MEM	:=	0
@@ -58,18 +67,17 @@ ifeq (${HW_ASSISTED_COHERENCY}, 0)
 				lib/cpus/aarch64/cortex_a73.S
 else
 # AArch64-only cores
-	FPGA_CPU_LIBS	+=lib/cpus/aarch64/cortex_a510.S		\
-				lib/cpus/aarch64/cortex_a710.S				\
-				lib/cpus/aarch64/cortex_a715.S				\
-				lib/cpus/aarch64/cortex_x3.S 				\
+	FPGA_CPU_LIBS	+=	lib/cpus/aarch64/cortex_a510.S			\
+				lib/cpus/aarch64/cortex_a520.S			\
+				lib/cpus/aarch64/cortex_a715.S			\
+				lib/cpus/aarch64/cortex_a720.S			\
+				lib/cpus/aarch64/cortex_x3.S 			\
+				lib/cpus/aarch64/cortex_x4.S			\
 				lib/cpus/aarch64/neoverse_n_common.S		\
-				lib/cpus/aarch64/neoverse_n1.S				\
-				lib/cpus/aarch64/neoverse_n2.S				\
-				lib/cpus/aarch64/neoverse_v1.S				\
-				lib/cpus/aarch64/cortex_hayes.S				\
-				lib/cpus/aarch64/cortex_hunter.S			\
-				lib/cpus/aarch64/cortex_hunter_elp_arm.S	\
-				lib/cpus/aarch64/cortex_chaberton.S			\
+				lib/cpus/aarch64/neoverse_n1.S			\
+				lib/cpus/aarch64/neoverse_n2.S			\
+				lib/cpus/aarch64/neoverse_v1.S			\
+				lib/cpus/aarch64/cortex_chaberton.S		\
 				lib/cpus/aarch64/cortex_blackhawk.S
 
 # AArch64/AArch32 cores

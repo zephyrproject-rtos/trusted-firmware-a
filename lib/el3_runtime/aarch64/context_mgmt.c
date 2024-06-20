@@ -20,10 +20,12 @@
 #include <context.h>
 #include <drivers/arm/gicv3.h>
 #include <lib/el3_runtime/context_mgmt.h>
+#include <lib/el3_runtime/cpu_data.h>
 #include <lib/el3_runtime/pubsub_events.h>
 #include <lib/extensions/amu.h>
 #include <lib/extensions/brbe.h>
 #include <lib/extensions/mpam.h>
+#include <lib/extensions/pmuv3.h>
 #include <lib/extensions/sme.h>
 #include <lib/extensions/spe.h>
 #include <lib/extensions/sve.h>
@@ -37,7 +39,12 @@
 CASSERT(((TWED_DELAY & ~SCR_TWEDEL_MASK) == 0U), assert_twed_delay_value_check);
 #endif /* ENABLE_FEAT_TWED */
 
+per_world_context_t per_world_context[CPU_DATA_CONTEXT_NUM];
+static bool has_secure_perworld_init;
+
+static void manage_extensions_nonsecure(cpu_context_t *ctx);
 static void manage_extensions_secure(cpu_context_t *ctx);
+static void manage_extensions_secure_per_world(void);
 
 static void setup_el1_context(cpu_context_t *ctx, const struct entry_point_info *ep)
 {
@@ -133,16 +140,6 @@ static void setup_secure_context(cpu_context_t *ctx, const struct entry_point_in
 	}
 #endif /* CTX_INCLUDE_MTE_REGS */
 
-	/* Enable S-EL2 if the next EL is EL2 and S-EL2 is present */
-	if ((GET_EL(ep->spsr) == MODE_EL2) && is_feat_sel2_supported()) {
-		if (GET_RW(ep->spsr) != MODE_RW_64) {
-			ERROR("S-EL2 can not be used in AArch32\n.");
-			panic();
-		}
-
-		scr_el3 |= SCR_EEL2_BIT;
-	}
-
 	write_ctx_reg(state, CTX_SCR_EL3, scr_el3);
 
 	/*
@@ -154,6 +151,18 @@ static void setup_secure_context(cpu_context_t *ctx, const struct entry_point_in
 #endif
 
 	manage_extensions_secure(ctx);
+
+	/**
+	 * manage_extensions_secure_per_world api has to be executed once,
+	 * as the registers getting initialised, maintain constant value across
+	 * all the cpus for the secure world.
+	 * Henceforth, this check ensures that the registers are initialised once
+	 * and avoids re-initialization from multiple cores.
+	 */
+	if (!has_secure_perworld_init) {
+		manage_extensions_secure_per_world();
+	}
+
 }
 
 #if ENABLE_RME
@@ -195,21 +204,33 @@ static void setup_ns_context(cpu_context_t *ctx, const struct entry_point_info *
 	/* SCR_NS: Set the NS bit */
 	scr_el3 |= SCR_NS_BIT;
 
-#if !CTX_INCLUDE_PAUTH_REGS
-	/*
-	 * If the pointer authentication registers aren't saved during world
-	 * switches the value of the registers can be leaked from the Secure to
-	 * the Non-secure world. To prevent this, rather than enabling pointer
-	 * authentication everywhere, we only enable it in the Non-secure world.
-	 *
-	 * If the Secure world wants to use pointer authentication,
-	 * CTX_INCLUDE_PAUTH_REGS must be set to 1.
-	 */
-	scr_el3 |= SCR_API_BIT | SCR_APK_BIT;
-#endif /* !CTX_INCLUDE_PAUTH_REGS */
-
 	/* Allow access to Allocation Tags when MTE is implemented. */
 	scr_el3 |= SCR_ATA_BIT;
+
+#if !CTX_INCLUDE_PAUTH_REGS
+	/*
+	 * Pointer Authentication feature, if present, is always enabled by default
+	 * for Non secure lower exception levels. We do not have an explicit
+	 * flag to set it.
+	 * CTX_INCLUDE_PAUTH_REGS flag, is explicitly used to enable for lower
+	 * exception levels of secure and realm worlds.
+	 *
+	 * To prevent the leakage between the worlds during world switch,
+	 * we enable it only for the non-secure world.
+	 *
+	 * If the Secure/realm world wants to use pointer authentication,
+	 * CTX_INCLUDE_PAUTH_REGS must be explicitly set to 1, in which case
+	 * it will be enabled globally for all the contexts.
+	 *
+	 * SCR_EL3.API: Set to one to not trap any PAuth instructions at ELs
+	 *  other than EL3
+	 *
+	 * SCR_EL3.APK: Set to one to not trap any PAuth key values at ELs other
+	 *  than EL3
+	 */
+	scr_el3 |= SCR_API_BIT | SCR_APK_BIT;
+
+#endif /* CTX_INCLUDE_PAUTH_REGS */
 
 #if HANDLE_EA_EL3_FIRST_NS
 	/* SCR_EL3.EA: Route External Abort and SError Interrupt to EL3. */
@@ -256,25 +277,6 @@ static void setup_ns_context(cpu_context_t *ctx, const struct entry_point_info *
 	write_ctx_reg(get_el2_sysregs_ctx(ctx), CTX_SCTLR_EL2,
 			sctlr_el2);
 
-	/*
-	 * Program the ICC_SRE_EL2 to make sure the correct bits are set
-	 * when restoring NS context.
-	 */
-	u_register_t icc_sre_el2 = ICC_SRE_DIB_BIT | ICC_SRE_DFB_BIT |
-				   ICC_SRE_EN_BIT | ICC_SRE_SRE_BIT;
-	write_ctx_reg(get_el2_sysregs_ctx(ctx), CTX_ICC_SRE_EL2,
-			icc_sre_el2);
-
-	/*
-	 * Initialize MDCR_EL2.HPMN to its hardware reset value so we don't
-	 * throw anyone off who expects this to be sensible.
-	 * TODO: A similar thing happens in cm_prepare_el3_exit. They should be
-	 * unified with the proper PMU implementation
-	 */
-	u_register_t mdcr_el2 = ((read_pmcr_el0() >> PMCR_EL0_N_SHIFT) &
-			PMCR_EL0_N_MASK);
-	write_ctx_reg(get_el2_sysregs_ctx(ctx), CTX_MDCR_EL2, mdcr_el2);
-
 	if (is_feat_hcx_supported()) {
 		/*
 		 * Initialize register HCRX_EL2 with its init value.
@@ -287,7 +289,23 @@ static void setup_ns_context(cpu_context_t *ctx, const struct entry_point_info *
 		write_ctx_reg(get_el2_sysregs_ctx(ctx), CTX_HCRX_EL2,
 			HCRX_EL2_INIT_VAL);
 	}
+
+	if (is_feat_fgt_supported()) {
+		/*
+		 * Initialize HFG*_EL2 registers with a default value so legacy
+		 * systems unaware of FEAT_FGT do not get trapped due to their lack
+		 * of initialization for this feature.
+		 */
+		write_ctx_reg(get_el2_sysregs_ctx(ctx), CTX_HFGITR_EL2,
+			HFGITR_EL2_INIT_VAL);
+		write_ctx_reg(get_el2_sysregs_ctx(ctx), CTX_HFGRTR_EL2,
+			HFGRTR_EL2_INIT_VAL);
+		write_ctx_reg(get_el2_sysregs_ctx(ctx), CTX_HFGWTR_EL2,
+			HFGWTR_EL2_INIT_VAL);
+	}
 #endif /* CTX_INCLUDE_EL2_REGS */
+
+	manage_extensions_nonsecure(ctx);
 }
 
 /*******************************************************************************
@@ -304,21 +322,48 @@ static void setup_context_common(cpu_context_t *ctx, const entry_point_info_t *e
 	el3_state_t *state;
 	gp_regs_t *gp_regs;
 
+	state = get_el3state_ctx(ctx);
+
 	/* Clear any residual register values from the context */
 	zeromem(ctx, sizeof(*ctx));
 
 	/*
-	 * SCR_EL3 was initialised during reset sequence in macro
-	 * el3_arch_init_common. This code modifies the SCR_EL3 fields that
-	 * affect the next EL.
-	 *
-	 * The following fields are initially set to zero and then updated to
-	 * the required value depending on the state of the SPSR_EL3 and the
-	 * Security state and entrypoint attributes of the next EL.
+	 * The lower-EL context is zeroed so that no stale values leak to a world.
+	 * It is assumed that an all-zero lower-EL context is good enough for it
+	 * to boot correctly. However, there are very few registers where this
+	 * is not true and some values need to be recreated.
 	 */
-	scr_el3 = read_scr();
-	scr_el3 &= ~(SCR_NS_BIT | SCR_RW_BIT | SCR_EA_BIT | SCR_FIQ_BIT | SCR_IRQ_BIT |
-			SCR_ST_BIT | SCR_HCE_BIT | SCR_NSE_BIT);
+#if CTX_INCLUDE_EL2_REGS
+	el2_sysregs_t *el2_ctx = get_el2_sysregs_ctx(ctx);
+
+	/*
+	 * These bits are set in the gicv3 driver. Losing them (especially the
+	 * SRE bit) is problematic for all worlds. Henceforth recreate them.
+	 */
+	u_register_t icc_sre_el2 = ICC_SRE_DIB_BIT | ICC_SRE_DFB_BIT |
+				   ICC_SRE_EN_BIT | ICC_SRE_SRE_BIT;
+	write_ctx_reg(el2_ctx, CTX_ICC_SRE_EL2, icc_sre_el2);
+#endif /* CTX_INCLUDE_EL2_REGS */
+
+	/* Start with a clean SCR_EL3 copy as all relevant values are set */
+	scr_el3 = SCR_RESET_VAL;
+
+	/*
+	 * SCR_EL3.TWE: Set to zero so that execution of WFE instructions at
+	 *  EL2, EL1 and EL0 are not trapped to EL3.
+	 *
+	 * SCR_EL3.TWI: Set to zero so that execution of WFI instructions at
+	 *  EL2, EL1 and EL0 are not trapped to EL3.
+	 *
+	 * SCR_EL3.SMD: Set to zero to enable SMC calls at EL1 and above, from
+	 *  both Security states and both Execution states.
+	 *
+	 * SCR_EL3.SIF: Set to one to disable secure instruction execution from
+	 *  Non-secure memory.
+	 */
+	scr_el3 &= ~(SCR_TWE_BIT | SCR_TWI_BIT | SCR_SMD_BIT);
+
+	scr_el3 |= SCR_SIF_BIT;
 
 	/*
 	 * SCR_EL3.RW: Set the execution state, AArch32 or AArch64, for next
@@ -360,6 +405,19 @@ static void setup_context_common(cpu_context_t *ctx, const entry_point_info_t *e
 	scr_el3 |= SCR_FIEN_BIT;
 #endif
 
+#if CTX_INCLUDE_PAUTH_REGS
+	/*
+	 * Enable Pointer Authentication globally for all the worlds.
+	 *
+	 * SCR_EL3.API: Set to one to not trap any PAuth instructions at ELs
+	 *  other than EL3
+	 *
+	 * SCR_EL3.APK: Set to one to not trap any PAuth key values at ELs other
+	 *  than EL3
+	 */
+	scr_el3 |= SCR_API_BIT | SCR_APK_BIT;
+#endif /* CTX_INCLUDE_PAUTH_REGS */
+
 	/*
 	 * SCR_EL3.TCR2EN: Enable access to TCR2_ELx for AArch64 if present.
 	 */
@@ -381,12 +439,6 @@ static void setup_context_common(cpu_context_t *ctx, const entry_point_info_t *e
 	if ((is_feat_gcs_supported()) && (GET_RW(ep->spsr) == MODE_RW_64)) {
 		scr_el3 |= SCR_GCSEn_BIT;
 	}
-
-	/*
-	 * CPTR_EL3 was initialized out of reset, copy that value to the
-	 * context register.
-	 */
-	write_ctx_reg(get_el3state_ctx(ctx), CTX_CPTR_EL3, read_cptr_el3());
 
 	/*
 	 * SCR_EL3.HCE: Enable HVC instructions if next execution state is
@@ -424,11 +476,22 @@ static void setup_context_common(cpu_context_t *ctx, const entry_point_info_t *e
 		scr_el3 |= SCR_TWEDEn_BIT;
 	}
 
+#if IMAGE_BL31 && defined(SPD_spmd) && SPMD_SPM_AT_SEL2
+	/* Enable S-EL2 if FEAT_SEL2 is implemented for all the contexts. */
+	if (is_feat_sel2_supported()) {
+		scr_el3 |= SCR_EEL2_BIT;
+	}
+#endif /* (IMAGE_BL31 && defined(SPD_spmd) && SPMD_SPM_AT_SEL2) */
+
+	if (is_feat_mpam_supported()) {
+		write_ctx_reg(get_el3state_ctx(ctx), CTX_MPAM3_EL3, \
+				MPAM3_EL3_RESET_VAL);
+	}
+
 	/*
 	 * Populate EL3 state so that we've the right context
 	 * before doing ERET
 	 */
-	state = get_el3state_ctx(ctx);
 	write_ctx_reg(state, CTX_SCR_EL3, scr_el3);
 	write_ctx_reg(state, CTX_ELR_EL3, ep->pc);
 	write_ctx_reg(state, CTX_SPSR_EL3, ep->spsr);
@@ -502,24 +565,125 @@ void cm_setup_context(cpu_context_t *ctx, const entry_point_info_t *ep)
 }
 
 /*******************************************************************************
- * Enable architecture extensions on first entry to Non-secure world.
- * When EL2 is implemented but unused `el2_unused` is non-zero, otherwise
- * it is zero.
+ * Enable architecture extensions for EL3 execution. This function only updates
+ * registers in-place which are expected to either never change or be
+ * overwritten by el3_exit.
  ******************************************************************************/
-static void manage_extensions_nonsecure(bool el2_unused, cpu_context_t *ctx)
-{
 #if IMAGE_BL31
+void cm_manage_extensions_el3(void)
+{
 	if (is_feat_spe_supported()) {
-		spe_enable(el2_unused);
+		spe_init_el3();
 	}
 
 	if (is_feat_amu_supported()) {
-		amu_enable(el2_unused, ctx);
+		amu_init_el3();
 	}
 
-	/* Enable SVE and FPU/SIMD */
+	if (is_feat_sme_supported()) {
+		sme_init_el3();
+	}
+
+	if (is_feat_trbe_supported()) {
+		trbe_init_el3();
+	}
+
+	if (is_feat_brbe_supported()) {
+		brbe_init_el3();
+	}
+
+	if (is_feat_trf_supported()) {
+		trf_init_el3();
+	}
+
+	pmuv3_init_el3();
+}
+#endif /* IMAGE_BL31 */
+
+/*******************************************************************************
+ * Initialise per_world_context for Non-Secure world.
+ * This function enables the architecture extensions, which have same value
+ * across the cores for the non-secure world.
+ ******************************************************************************/
+#if IMAGE_BL31
+void manage_extensions_nonsecure_per_world(void)
+{
+	if (is_feat_sme_supported()) {
+		sme_enable_per_world(&per_world_context[CPU_CONTEXT_NS]);
+	}
+
 	if (is_feat_sve_supported()) {
-		sve_enable(ctx);
+		sve_enable_per_world(&per_world_context[CPU_CONTEXT_NS]);
+	}
+
+	if (is_feat_amu_supported()) {
+		amu_enable_per_world(&per_world_context[CPU_CONTEXT_NS]);
+	}
+
+	if (is_feat_sys_reg_trace_supported()) {
+		sys_reg_trace_enable_per_world(&per_world_context[CPU_CONTEXT_NS]);
+	}
+}
+#endif /* IMAGE_BL31 */
+
+/*******************************************************************************
+ * Initialise per_world_context for Secure world.
+ * This function enables the architecture extensions, which have same value
+ * across the cores for the secure world.
+ ******************************************************************************/
+
+static void manage_extensions_secure_per_world(void)
+{
+#if IMAGE_BL31
+	if (is_feat_sme_supported()) {
+
+		if (ENABLE_SME_FOR_SWD) {
+		/*
+		 * Enable SME, SVE, FPU/SIMD in secure context, SPM must ensure
+		 * SME, SVE, and FPU/SIMD context properly managed.
+		 */
+			sme_enable_per_world(&per_world_context[CPU_CONTEXT_SECURE]);
+		} else {
+		/*
+		 * Disable SME, SVE, FPU/SIMD in secure context so non-secure
+		 * world can safely use the associated registers.
+		 */
+			sme_disable_per_world(&per_world_context[CPU_CONTEXT_SECURE]);
+		}
+	}
+	if (is_feat_sve_supported()) {
+		if (ENABLE_SVE_FOR_SWD) {
+		/*
+		 * Enable SVE and FPU in secure context, SPM must ensure
+		 * that the SVE and FPU register contexts are properly managed.
+		 */
+			sve_enable_per_world(&per_world_context[CPU_CONTEXT_SECURE]);
+		} else {
+		/*
+		 * Disable SVE and FPU in secure context so non-secure world
+		 * can safely use them.
+		 */
+			sve_disable_per_world(&per_world_context[CPU_CONTEXT_SECURE]);
+		}
+	}
+
+	/* NS can access this but Secure shouldn't */
+	if (is_feat_sys_reg_trace_supported()) {
+		sys_reg_trace_disable_per_world(&per_world_context[CPU_CONTEXT_SECURE]);
+	}
+
+	has_secure_perworld_init = true;
+#endif /* IMAGE_BL31 */
+}
+
+/*******************************************************************************
+ * Enable architecture extensions on first entry to Non-secure world.
+ ******************************************************************************/
+static void manage_extensions_nonsecure(cpu_context_t *ctx)
+{
+#if IMAGE_BL31
+	if (is_feat_amu_supported()) {
+		amu_enable(ctx);
 	}
 
 	if (is_feat_sme_supported()) {
@@ -527,26 +691,74 @@ static void manage_extensions_nonsecure(bool el2_unused, cpu_context_t *ctx)
 	}
 
 	if (is_feat_mpam_supported()) {
-		mpam_enable(el2_unused);
+		mpam_enable(ctx);
+	}
+	pmuv3_enable(ctx);
+#endif /* IMAGE_BL31 */
+}
+
+/* TODO: move to lib/extensions/pauth when it has been ported to FEAT_STATE */
+static __unused void enable_pauth_el2(void)
+{
+	u_register_t hcr_el2 = read_hcr_el2();
+	/*
+	 * For Armv8.3 pointer authentication feature, disable traps to EL2 when
+	 *  accessing key registers or using pointer authentication instructions
+	 *  from lower ELs.
+	 */
+	hcr_el2 |= (HCR_API_BIT | HCR_APK_BIT);
+
+	write_hcr_el2(hcr_el2);
+}
+
+#if INIT_UNUSED_NS_EL2
+/*******************************************************************************
+ * Enable architecture extensions in-place at EL2 on first entry to Non-secure
+ * world when EL2 is empty and unused.
+ ******************************************************************************/
+static void manage_extensions_nonsecure_el2_unused(void)
+{
+#if IMAGE_BL31
+	if (is_feat_spe_supported()) {
+		spe_init_el2_unused();
+	}
+
+	if (is_feat_amu_supported()) {
+		amu_init_el2_unused();
+	}
+
+	if (is_feat_mpam_supported()) {
+		mpam_init_el2_unused();
 	}
 
 	if (is_feat_trbe_supported()) {
-		trbe_enable();
-	}
-
-	if (is_feat_brbe_supported()) {
-		brbe_enable();
+		trbe_init_el2_unused();
 	}
 
 	if (is_feat_sys_reg_trace_supported()) {
-		sys_reg_trace_enable(ctx);
+		sys_reg_trace_init_el2_unused();
 	}
 
 	if (is_feat_trf_supported()) {
-		trf_enable();
+		trf_init_el2_unused();
 	}
-#endif
+
+	pmuv3_init_el2_unused();
+
+	if (is_feat_sve_supported()) {
+		sve_init_el2_unused();
+	}
+
+	if (is_feat_sme_supported()) {
+		sme_init_el2_unused();
+	}
+
+#if ENABLE_PAUTH
+	enable_pauth_el2();
+#endif /* ENABLE_PAUTH */
+#endif /* IMAGE_BL31 */
 }
+#endif /* INIT_UNUSED_NS_EL2 */
 
 /*******************************************************************************
  * Enable architecture extensions on first entry to Secure world.
@@ -554,29 +766,13 @@ static void manage_extensions_nonsecure(bool el2_unused, cpu_context_t *ctx)
 static void manage_extensions_secure(cpu_context_t *ctx)
 {
 #if IMAGE_BL31
-	if (is_feat_sve_supported()) {
-		if (ENABLE_SVE_FOR_SWD) {
-		/*
-		 * Enable SVE and FPU in secure context, secure manager must
-		 * ensure that the SVE and FPU register contexts are properly
-		 * managed.
-		 */
-			sve_enable(ctx);
-		} else {
-		/*
-		 * Disable SVE and FPU in secure context so non-secure world
-		 * can safely use them.
-		 */
-			sve_disable(ctx);
-		}
-	}
-
 	if (is_feat_sme_supported()) {
 		if (ENABLE_SME_FOR_SWD) {
 		/*
 		 * Enable SME, SVE, FPU/SIMD in secure context, secure manager
 		 * must ensure SME, SVE, and FPU/SIMD context properly managed.
 		 */
+			sme_init_el3();
 			sme_enable(ctx);
 		} else {
 		/*
@@ -614,6 +810,111 @@ void cm_init_my_context(const entry_point_info_t *ep)
 	cm_setup_context(ctx, ep);
 }
 
+/* EL2 present but unused, need to disable safely. SCTLR_EL2 can be ignored */
+static void init_nonsecure_el2_unused(cpu_context_t *ctx)
+{
+#if INIT_UNUSED_NS_EL2
+	u_register_t hcr_el2 = HCR_RESET_VAL;
+	u_register_t mdcr_el2;
+	u_register_t scr_el3;
+
+	scr_el3 = read_ctx_reg(get_el3state_ctx(ctx), CTX_SCR_EL3);
+
+	/* Set EL2 register width: Set HCR_EL2.RW to match SCR_EL3.RW */
+	if ((scr_el3 & SCR_RW_BIT) != 0U) {
+		hcr_el2 |= HCR_RW_BIT;
+	}
+
+	write_hcr_el2(hcr_el2);
+
+	/*
+	 * Initialise CPTR_EL2 setting all fields rather than relying on the hw.
+	 * All fields have architecturally UNKNOWN reset values.
+	 */
+	write_cptr_el2(CPTR_EL2_RESET_VAL);
+
+	/*
+	 * Initialise CNTHCTL_EL2. All fields are architecturally UNKNOWN on
+	 * reset and are set to zero except for field(s) listed below.
+	 *
+	 * CNTHCTL_EL2.EL1PTEN: Set to one to disable traps to Hyp mode of
+	 * Non-secure EL0 and EL1 accesses to the physical timer registers.
+	 *
+	 * CNTHCTL_EL2.EL1PCTEN: Set to one to disable traps to Hyp mode of
+	 * Non-secure EL0 and EL1 accesses to the physical counter registers.
+	 */
+	write_cnthctl_el2(CNTHCTL_RESET_VAL | EL1PCEN_BIT | EL1PCTEN_BIT);
+
+	/*
+	 * Initialise CNTVOFF_EL2 to zero as it resets to an architecturally
+	 * UNKNOWN value.
+	 */
+	write_cntvoff_el2(0);
+
+	/*
+	 * Set VPIDR_EL2 and VMPIDR_EL2 to match MIDR_EL1 and MPIDR_EL1
+	 * respectively.
+	 */
+	write_vpidr_el2(read_midr_el1());
+	write_vmpidr_el2(read_mpidr_el1());
+
+	/*
+	 * Initialise VTTBR_EL2. All fields are architecturally UNKNOWN on reset.
+	 *
+	 * VTTBR_EL2.VMID: Set to zero. Even though EL1&0 stage 2 address
+	 * translation is disabled, cache maintenance operations depend on the
+	 * VMID.
+	 *
+	 * VTTBR_EL2.BADDR: Set to zero as EL1&0 stage 2 address translation is
+	 * disabled.
+	 */
+	write_vttbr_el2(VTTBR_RESET_VAL &
+		     ~((VTTBR_VMID_MASK << VTTBR_VMID_SHIFT) |
+		       (VTTBR_BADDR_MASK << VTTBR_BADDR_SHIFT)));
+
+	/*
+	 * Initialise MDCR_EL2, setting all fields rather than relying on hw.
+	 * Some fields are architecturally UNKNOWN on reset.
+	 *
+	 * MDCR_EL2.TDRA: Set to zero so that Non-secure EL0 and EL1 System
+	 * register accesses to the Debug ROM registers are not trapped to EL2.
+	 *
+	 * MDCR_EL2.TDOSA: Set to zero so that Non-secure EL1 System register
+	 * accesses to the powerdown debug registers are not trapped to EL2.
+	 *
+	 * MDCR_EL2.TDA: Set to zero so that System register accesses to the
+	 * debug registers do not trap to EL2.
+	 *
+	 * MDCR_EL2.TDE: Set to zero so that debug exceptions are not routed to
+	 * EL2.
+	 */
+	mdcr_el2 = MDCR_EL2_RESET_VAL &
+		 ~(MDCR_EL2_TDRA_BIT | MDCR_EL2_TDOSA_BIT | MDCR_EL2_TDA_BIT |
+		   MDCR_EL2_TDE_BIT);
+
+	write_mdcr_el2(mdcr_el2);
+
+	/*
+	 * Initialise HSTR_EL2. All fields are architecturally UNKNOWN on reset.
+	 *
+	 * HSTR_EL2.T<n>: Set all these fields to zero so that Non-secure EL0 or
+	 * EL1 accesses to System registers do not trap to EL2.
+	 */
+	write_hstr_el2(HSTR_EL2_RESET_VAL & ~(HSTR_EL2_T_MASK));
+
+	/*
+	 * Initialise CNTHP_CTL_EL2. All fields are architecturally UNKNOWN on
+	 * reset.
+	 *
+	 * CNTHP_CTL_EL2:ENABLE: Set to zero to disable the EL2 physical timer
+	 * and prevent timer interrupts.
+	 */
+	write_cnthp_ctl_el2(CNTHP_CTL_RESET_VAL & ~(CNTHP_CTL_ENABLE_BIT));
+
+	manage_extensions_nonsecure_el2_unused();
+#endif /* INIT_UNUSED_NS_EL2 */
+}
+
 /*******************************************************************************
  * Prepare the CPU system registers for first entry into realm, secure, or
  * normal world.
@@ -625,10 +926,8 @@ void cm_init_my_context(const entry_point_info_t *ep)
  ******************************************************************************/
 void cm_prepare_el3_exit(uint32_t security_state)
 {
-	u_register_t sctlr_elx, scr_el3, mdcr_el2;
+	u_register_t sctlr_elx, scr_el3;
 	cpu_context_t *ctx = cm_get_context(security_state);
-	bool el2_unused = false;
-	uint64_t hcr_el2 = 0U;
 
 	assert(ctx != NULL);
 
@@ -647,7 +946,26 @@ void cm_prepare_el3_exit(uint32_t security_state)
 			if (is_feat_hcx_supported()) {
 				write_hcrx_el2(HCRX_EL2_INIT_VAL);
 			}
+
+			/*
+			 * Initialize Fine-grained trap registers introduced
+			 * by FEAT_FGT so all traps are initially disabled when
+			 * switching to EL2 or a lower EL, preventing undesired
+			 * behavior.
+			 */
+			if (is_feat_fgt_supported()) {
+				/*
+				 * Initialize HFG*_EL2 registers with a default
+				 * value so legacy systems unaware of FEAT_FGT
+				 * do not get trapped due to their lack of
+				 * initialization for this feature.
+				 */
+				write_hfgitr_el2(HFGITR_EL2_INIT_VAL);
+				write_hfgrtr_el2(HFGRTR_EL2_INIT_VAL);
+				write_hfgwtr_el2(HFGWTR_EL2_INIT_VAL);
+			}
 		}
+
 
 		if ((scr_el3 & SCR_HCE_BIT) != 0U) {
 			/* Use SCTLR_EL1.EE value to initialise sctlr_el2 */
@@ -665,188 +983,8 @@ void cm_prepare_el3_exit(uint32_t security_state)
 #endif
 			write_sctlr_el2(sctlr_elx);
 		} else if (el2_implemented != EL_IMPL_NONE) {
-			el2_unused = true;
-
-			/*
-			 * EL2 present but unused, need to disable safely.
-			 * SCTLR_EL2 can be ignored in this case.
-			 *
-			 * Set EL2 register width appropriately: Set HCR_EL2
-			 * field to match SCR_EL3.RW.
-			 */
-			if ((scr_el3 & SCR_RW_BIT) != 0U)
-				hcr_el2 |= HCR_RW_BIT;
-
-			/*
-			 * For Armv8.3 pointer authentication feature, disable
-			 * traps to EL2 when accessing key registers or using
-			 * pointer authentication instructions from lower ELs.
-			 */
-			hcr_el2 |= (HCR_API_BIT | HCR_APK_BIT);
-
-			write_hcr_el2(hcr_el2);
-
-			/*
-			 * Initialise CPTR_EL2 setting all fields rather than
-			 * relying on the hw. All fields have architecturally
-			 * UNKNOWN reset values.
-			 *
-			 * CPTR_EL2.TCPAC: Set to zero so that Non-secure EL1
-			 *  accesses to the CPACR_EL1 or CPACR from both
-			 *  Execution states do not trap to EL2.
-			 *
-			 * CPTR_EL2.TTA: Set to zero so that Non-secure System
-			 *  register accesses to the trace registers from both
-			 *  Execution states do not trap to EL2.
-			 *  If PE trace unit System registers are not implemented
-			 *  then this bit is reserved, and must be set to zero.
-			 *
-			 * CPTR_EL2.TFP: Set to zero so that Non-secure accesses
-			 *  to SIMD and floating-point functionality from both
-			 *  Execution states do not trap to EL2.
-			 */
-			write_cptr_el2(CPTR_EL2_RESET_VAL &
-					~(CPTR_EL2_TCPAC_BIT | CPTR_EL2_TTA_BIT
-					| CPTR_EL2_TFP_BIT));
-
-			/*
-			 * Initialise CNTHCTL_EL2. All fields are
-			 * architecturally UNKNOWN on reset and are set to zero
-			 * except for field(s) listed below.
-			 *
-			 * CNTHCTL_EL2.EL1PTEN: Set to one to disable traps to
-			 *  Hyp mode of Non-secure EL0 and EL1 accesses to the
-			 *  physical timer registers.
-			 *
-			 * CNTHCTL_EL2.EL1PCTEN: Set to one to disable traps to
-			 *  Hyp mode of  Non-secure EL0 and EL1 accesses to the
-			 *  physical counter registers.
-			 */
-			write_cnthctl_el2(CNTHCTL_RESET_VAL |
-						EL1PCEN_BIT | EL1PCTEN_BIT);
-
-			/*
-			 * Initialise CNTVOFF_EL2 to zero as it resets to an
-			 * architecturally UNKNOWN value.
-			 */
-			write_cntvoff_el2(0);
-
-			/*
-			 * Set VPIDR_EL2 and VMPIDR_EL2 to match MIDR_EL1 and
-			 * MPIDR_EL1 respectively.
-			 */
-			write_vpidr_el2(read_midr_el1());
-			write_vmpidr_el2(read_mpidr_el1());
-
-			/*
-			 * Initialise VTTBR_EL2. All fields are architecturally
-			 * UNKNOWN on reset.
-			 *
-			 * VTTBR_EL2.VMID: Set to zero. Even though EL1&0 stage
-			 *  2 address translation is disabled, cache maintenance
-			 *  operations depend on the VMID.
-			 *
-			 * VTTBR_EL2.BADDR: Set to zero as EL1&0 stage 2 address
-			 *  translation is disabled.
-			 */
-			write_vttbr_el2(VTTBR_RESET_VAL &
-				~((VTTBR_VMID_MASK << VTTBR_VMID_SHIFT)
-				| (VTTBR_BADDR_MASK << VTTBR_BADDR_SHIFT)));
-
-			/*
-			 * Initialise MDCR_EL2, setting all fields rather than
-			 * relying on hw. Some fields are architecturally
-			 * UNKNOWN on reset.
-			 *
-			 * MDCR_EL2.HLP: Set to one so that event counter
-			 *  overflow, that is recorded in PMOVSCLR_EL0[0-30],
-			 *  occurs on the increment that changes
-			 *  PMEVCNTR<n>_EL0[63] from 1 to 0, when ARMv8.5-PMU is
-			 *  implemented. This bit is RES0 in versions of the
-			 *  architecture earlier than ARMv8.5, setting it to 1
-			 *  doesn't have any effect on them.
-			 *
-			 * MDCR_EL2.TTRF: Set to zero so that access to Trace
-			 *  Filter Control register TRFCR_EL1 at EL1 is not
-			 *  trapped to EL2. This bit is RES0 in versions of
-			 *  the architecture earlier than ARMv8.4.
-			 *
-			 * MDCR_EL2.HPMD: Set to one so that event counting is
-			 *  prohibited at EL2. This bit is RES0 in versions of
-			 *  the architecture earlier than ARMv8.1, setting it
-			 *  to 1 doesn't have any effect on them.
-			 *
-			 * MDCR_EL2.TPMS: Set to zero so that accesses to
-			 *  Statistical Profiling control registers from EL1
-			 *  do not trap to EL2. This bit is RES0 when SPE is
-			 *  not implemented.
-			 *
-			 * MDCR_EL2.TDRA: Set to zero so that Non-secure EL0 and
-			 *  EL1 System register accesses to the Debug ROM
-			 *  registers are not trapped to EL2.
-			 *
-			 * MDCR_EL2.TDOSA: Set to zero so that Non-secure EL1
-			 *  System register accesses to the powerdown debug
-			 *  registers are not trapped to EL2.
-			 *
-			 * MDCR_EL2.TDA: Set to zero so that System register
-			 *  accesses to the debug registers do not trap to EL2.
-			 *
-			 * MDCR_EL2.TDE: Set to zero so that debug exceptions
-			 *  are not routed to EL2.
-			 *
-			 * MDCR_EL2.HPME: Set to zero to disable EL2 Performance
-			 *  Monitors.
-			 *
-			 * MDCR_EL2.TPM: Set to zero so that Non-secure EL0 and
-			 *  EL1 accesses to all Performance Monitors registers
-			 *  are not trapped to EL2.
-			 *
-			 * MDCR_EL2.TPMCR: Set to zero so that Non-secure EL0
-			 *  and EL1 accesses to the PMCR_EL0 or PMCR are not
-			 *  trapped to EL2.
-			 *
-			 * MDCR_EL2.HPMN: Set to value of PMCR_EL0.N which is the
-			 *  architecturally-defined reset value.
-			 *
-			 * MDCR_EL2.E2TB: Set to zero so that the trace Buffer
-			 *  owning exception level is NS-EL1 and, tracing is
-			 *  prohibited at NS-EL2. These bits are RES0 when
-			 *  FEAT_TRBE is not implemented.
-			 */
-			mdcr_el2 = ((MDCR_EL2_RESET_VAL | MDCR_EL2_HLP |
-				     MDCR_EL2_HPMD) |
-				   ((read_pmcr_el0() & PMCR_EL0_N_BITS)
-				   >> PMCR_EL0_N_SHIFT)) &
-				   ~(MDCR_EL2_TTRF | MDCR_EL2_TPMS |
-				     MDCR_EL2_TDRA_BIT | MDCR_EL2_TDOSA_BIT |
-				     MDCR_EL2_TDA_BIT | MDCR_EL2_TDE_BIT |
-				     MDCR_EL2_HPME_BIT | MDCR_EL2_TPM_BIT |
-				     MDCR_EL2_TPMCR_BIT |
-				     MDCR_EL2_E2TB(MDCR_EL2_E2TB_EL1));
-
-			write_mdcr_el2(mdcr_el2);
-
-			/*
-			 * Initialise HSTR_EL2. All fields are architecturally
-			 * UNKNOWN on reset.
-			 *
-			 * HSTR_EL2.T<n>: Set all these fields to zero so that
-			 *  Non-secure EL0 or EL1 accesses to System registers
-			 *  do not trap to EL2.
-			 */
-			write_hstr_el2(HSTR_EL2_RESET_VAL & ~(HSTR_EL2_T_MASK));
-			/*
-			 * Initialise CNTHP_CTL_EL2. All fields are
-			 * architecturally UNKNOWN on reset.
-			 *
-			 * CNTHP_CTL_EL2:ENABLE: Set to zero to disable the EL2
-			 *  physical timer and prevent timer interrupts.
-			 */
-			write_cnthp_ctl_el2(CNTHP_CTL_RESET_VAL &
-						~(CNTHP_CTL_ENABLE_BIT));
+			init_nonsecure_el2_unused(ctx);
 		}
-		manage_extensions_nonsecure(el2_unused, ctx);
 	}
 
 	cm_el1_sysregs_context_restore(security_state);
@@ -969,92 +1107,185 @@ static void el2_sysregs_context_restore_mpam(el2_sysregs_t *ctx)
 	}
 }
 
+/* -----------------------------------------------------
+ * The following registers are not added:
+ * AMEVCNTVOFF0<n>_EL2
+ * AMEVCNTVOFF1<n>_EL2
+ * ICH_AP0R<n>_EL2
+ * ICH_AP1R<n>_EL2
+ * ICH_LR<n>_EL2
+ * -----------------------------------------------------
+ */
+static void el2_sysregs_context_save_common(el2_sysregs_t *ctx)
+{
+	write_ctx_reg(ctx, CTX_ACTLR_EL2, read_actlr_el2());
+	write_ctx_reg(ctx, CTX_AFSR0_EL2, read_afsr0_el2());
+	write_ctx_reg(ctx, CTX_AFSR1_EL2, read_afsr1_el2());
+	write_ctx_reg(ctx, CTX_AMAIR_EL2, read_amair_el2());
+	write_ctx_reg(ctx, CTX_CNTHCTL_EL2, read_cnthctl_el2());
+	write_ctx_reg(ctx, CTX_CNTVOFF_EL2, read_cntvoff_el2());
+	write_ctx_reg(ctx, CTX_CPTR_EL2, read_cptr_el2());
+	if (CTX_INCLUDE_AARCH32_REGS) {
+		write_ctx_reg(ctx, CTX_DBGVCR32_EL2, read_dbgvcr32_el2());
+	}
+	write_ctx_reg(ctx, CTX_ELR_EL2, read_elr_el2());
+	write_ctx_reg(ctx, CTX_ESR_EL2, read_esr_el2());
+	write_ctx_reg(ctx, CTX_FAR_EL2, read_far_el2());
+	write_ctx_reg(ctx, CTX_HACR_EL2, read_hacr_el2());
+	write_ctx_reg(ctx, CTX_HCR_EL2, read_hcr_el2());
+	write_ctx_reg(ctx, CTX_HPFAR_EL2, read_hpfar_el2());
+	write_ctx_reg(ctx, CTX_HSTR_EL2, read_hstr_el2());
+
+	/*
+	 * Set the NS bit to be able to access the ICC_SRE_EL2 register
+	 * TODO: remove with root context
+	 */
+	u_register_t scr_el3 = read_scr_el3();
+
+	write_scr_el3(scr_el3 | SCR_NS_BIT);
+	isb();
+	write_ctx_reg(ctx, CTX_ICC_SRE_EL2, read_icc_sre_el2());
+
+	write_scr_el3(scr_el3);
+	isb();
+
+	write_ctx_reg(ctx, CTX_ICH_HCR_EL2, read_ich_hcr_el2());
+	write_ctx_reg(ctx, CTX_ICH_VMCR_EL2, read_ich_vmcr_el2());
+	write_ctx_reg(ctx, CTX_MAIR_EL2, read_mair_el2());
+	write_ctx_reg(ctx, CTX_MDCR_EL2, read_mdcr_el2());
+	write_ctx_reg(ctx, CTX_SCTLR_EL2, read_sctlr_el2());
+	write_ctx_reg(ctx, CTX_SPSR_EL2, read_spsr_el2());
+	write_ctx_reg(ctx, CTX_SP_EL2, read_sp_el2());
+	write_ctx_reg(ctx, CTX_TCR_EL2, read_tcr_el2());
+	write_ctx_reg(ctx, CTX_TPIDR_EL2, read_tpidr_el2());
+	write_ctx_reg(ctx, CTX_TTBR0_EL2, read_ttbr0_el2());
+	write_ctx_reg(ctx, CTX_VBAR_EL2, read_vbar_el2());
+	write_ctx_reg(ctx, CTX_VMPIDR_EL2, read_vmpidr_el2());
+	write_ctx_reg(ctx, CTX_VPIDR_EL2, read_vpidr_el2());
+	write_ctx_reg(ctx, CTX_VTCR_EL2, read_vtcr_el2());
+	write_ctx_reg(ctx, CTX_VTTBR_EL2, read_vttbr_el2());
+}
+
+static void el2_sysregs_context_restore_common(el2_sysregs_t *ctx)
+{
+	write_actlr_el2(read_ctx_reg(ctx, CTX_ACTLR_EL2));
+	write_afsr0_el2(read_ctx_reg(ctx, CTX_AFSR0_EL2));
+	write_afsr1_el2(read_ctx_reg(ctx, CTX_AFSR1_EL2));
+	write_amair_el2(read_ctx_reg(ctx, CTX_AMAIR_EL2));
+	write_cnthctl_el2(read_ctx_reg(ctx, CTX_CNTHCTL_EL2));
+	write_cntvoff_el2(read_ctx_reg(ctx, CTX_CNTVOFF_EL2));
+	write_cptr_el2(read_ctx_reg(ctx, CTX_CPTR_EL2));
+	if (CTX_INCLUDE_AARCH32_REGS) {
+		write_dbgvcr32_el2(read_ctx_reg(ctx, CTX_DBGVCR32_EL2));
+	}
+	write_elr_el2(read_ctx_reg(ctx, CTX_ELR_EL2));
+	write_esr_el2(read_ctx_reg(ctx, CTX_ESR_EL2));
+	write_far_el2(read_ctx_reg(ctx, CTX_FAR_EL2));
+	write_hacr_el2(read_ctx_reg(ctx, CTX_HACR_EL2));
+	write_hcr_el2(read_ctx_reg(ctx, CTX_HCR_EL2));
+	write_hpfar_el2(read_ctx_reg(ctx, CTX_HPFAR_EL2));
+	write_hstr_el2(read_ctx_reg(ctx, CTX_HSTR_EL2));
+
+	/*
+	 * Set the NS bit to be able to access the ICC_SRE_EL2 register
+	 * TODO: remove with root context
+	 */
+	u_register_t scr_el3 = read_scr_el3();
+
+	write_scr_el3(scr_el3 | SCR_NS_BIT);
+	isb();
+	write_icc_sre_el2(read_ctx_reg(ctx, CTX_ICC_SRE_EL2));
+
+	write_scr_el3(scr_el3);
+	isb();
+
+	write_ich_hcr_el2(read_ctx_reg(ctx, CTX_ICH_HCR_EL2));
+	write_ich_vmcr_el2(read_ctx_reg(ctx, CTX_ICH_VMCR_EL2));
+	write_mair_el2(read_ctx_reg(ctx, CTX_MAIR_EL2));
+	write_mdcr_el2(read_ctx_reg(ctx, CTX_MDCR_EL2));
+	write_sctlr_el2(read_ctx_reg(ctx, CTX_SCTLR_EL2));
+	write_spsr_el2(read_ctx_reg(ctx, CTX_SPSR_EL2));
+	write_sp_el2(read_ctx_reg(ctx, CTX_SP_EL2));
+	write_tcr_el2(read_ctx_reg(ctx, CTX_TCR_EL2));
+	write_tpidr_el2(read_ctx_reg(ctx, CTX_TPIDR_EL2));
+	write_ttbr0_el2(read_ctx_reg(ctx, CTX_TTBR0_EL2));
+	write_vbar_el2(read_ctx_reg(ctx, CTX_VBAR_EL2));
+	write_vmpidr_el2(read_ctx_reg(ctx, CTX_VMPIDR_EL2));
+	write_vpidr_el2(read_ctx_reg(ctx, CTX_VPIDR_EL2));
+	write_vtcr_el2(read_ctx_reg(ctx, CTX_VTCR_EL2));
+	write_vttbr_el2(read_ctx_reg(ctx, CTX_VTTBR_EL2));
+}
+
 /*******************************************************************************
  * Save EL2 sysreg context
  ******************************************************************************/
 void cm_el2_sysregs_context_save(uint32_t security_state)
 {
-	u_register_t scr_el3 = read_scr();
+	cpu_context_t *ctx;
+	el2_sysregs_t *el2_sysregs_ctx;
 
-	/*
-	 * Always save the non-secure and realm EL2 context, only save the
-	 * S-EL2 context if S-EL2 is enabled.
-	 */
-	if ((security_state != SECURE) ||
-	    ((security_state == SECURE) && ((scr_el3 & SCR_EEL2_BIT) != 0U))) {
-		cpu_context_t *ctx;
-		el2_sysregs_t *el2_sysregs_ctx;
+	ctx = cm_get_context(security_state);
+	assert(ctx != NULL);
 
-		ctx = cm_get_context(security_state);
-		assert(ctx != NULL);
+	el2_sysregs_ctx = get_el2_sysregs_ctx(ctx);
 
-		el2_sysregs_ctx = get_el2_sysregs_ctx(ctx);
-
-		el2_sysregs_context_save_common(el2_sysregs_ctx);
+	el2_sysregs_context_save_common(el2_sysregs_ctx);
 #if CTX_INCLUDE_MTE_REGS
-		el2_sysregs_context_save_mte(el2_sysregs_ctx);
+	write_ctx_reg(el2_sysregs_ctx, CTX_TFSR_EL2, read_tfsr_el2());
 #endif
-		if (is_feat_mpam_supported()) {
-			el2_sysregs_context_save_mpam(el2_sysregs_ctx);
-		}
+	if (is_feat_mpam_supported()) {
+		el2_sysregs_context_save_mpam(el2_sysregs_ctx);
+	}
 
-		if (is_feat_fgt_supported()) {
-			el2_sysregs_context_save_fgt(el2_sysregs_ctx);
-		}
+	if (is_feat_fgt_supported()) {
+		el2_sysregs_context_save_fgt(el2_sysregs_ctx);
+	}
 
-		if (is_feat_ecv_v2_supported()) {
-			write_ctx_reg(el2_sysregs_ctx, CTX_CNTPOFF_EL2,
-				      read_cntpoff_el2());
-		}
+	if (is_feat_ecv_v2_supported()) {
+		write_ctx_reg(el2_sysregs_ctx, CTX_CNTPOFF_EL2, read_cntpoff_el2());
+	}
 
-		if (is_feat_vhe_supported()) {
-			write_ctx_reg(el2_sysregs_ctx, CTX_CONTEXTIDR_EL2,
-				      read_contextidr_el2());
-			write_ctx_reg(el2_sysregs_ctx, CTX_TTBR1_EL2,
-				      read_ttbr1_el2());
-		}
+	if (is_feat_vhe_supported()) {
+		write_ctx_reg(el2_sysregs_ctx, CTX_CONTEXTIDR_EL2, read_contextidr_el2());
+		write_ctx_reg(el2_sysregs_ctx, CTX_TTBR1_EL2, read_ttbr1_el2());
+	}
 
-		if (is_feat_ras_supported()) {
-			write_ctx_reg(el2_sysregs_ctx, CTX_VDISR_EL2,
-				      read_vdisr_el2());
-			write_ctx_reg(el2_sysregs_ctx, CTX_VSESR_EL2,
-				      read_vsesr_el2());
-		}
+	if (is_feat_ras_supported()) {
+		write_ctx_reg(el2_sysregs_ctx, CTX_VDISR_EL2, read_vdisr_el2());
+		write_ctx_reg(el2_sysregs_ctx, CTX_VSESR_EL2, read_vsesr_el2());
+	}
 
-		if (is_feat_nv2_supported()) {
-			write_ctx_reg(el2_sysregs_ctx, CTX_VNCR_EL2,
-				      read_vncr_el2());
-		}
+	if (is_feat_nv2_supported()) {
+		write_ctx_reg(el2_sysregs_ctx, CTX_VNCR_EL2, read_vncr_el2());
+	}
 
-		if (is_feat_trf_supported()) {
-			write_ctx_reg(el2_sysregs_ctx, CTX_TRFCR_EL2, read_trfcr_el2());
-		}
+	if (is_feat_trf_supported()) {
+		write_ctx_reg(el2_sysregs_ctx, CTX_TRFCR_EL2, read_trfcr_el2());
+	}
 
-		if (is_feat_csv2_2_supported()) {
-			write_ctx_reg(el2_sysregs_ctx, CTX_SCXTNUM_EL2,
-				      read_scxtnum_el2());
-		}
+	if (is_feat_csv2_2_supported()) {
+		write_ctx_reg(el2_sysregs_ctx, CTX_SCXTNUM_EL2, read_scxtnum_el2());
+	}
 
-		if (is_feat_hcx_supported()) {
-			write_ctx_reg(el2_sysregs_ctx, CTX_HCRX_EL2, read_hcrx_el2());
-		}
-		if (is_feat_tcr2_supported()) {
-			write_ctx_reg(el2_sysregs_ctx, CTX_TCR2_EL2, read_tcr2_el2());
-		}
-		if (is_feat_sxpie_supported()) {
-			write_ctx_reg(el2_sysregs_ctx, CTX_PIRE0_EL2, read_pire0_el2());
-			write_ctx_reg(el2_sysregs_ctx, CTX_PIR_EL2, read_pir_el2());
-		}
-		if (is_feat_s2pie_supported()) {
-			write_ctx_reg(el2_sysregs_ctx, CTX_S2PIR_EL2, read_s2pir_el2());
-		}
-		if (is_feat_sxpoe_supported()) {
-			write_ctx_reg(el2_sysregs_ctx, CTX_POR_EL2, read_por_el2());
-		}
-		if (is_feat_gcs_supported()) {
-			write_ctx_reg(el2_sysregs_ctx, CTX_GCSPR_EL2, read_gcspr_el2());
-			write_ctx_reg(el2_sysregs_ctx, CTX_GCSCR_EL2, read_gcscr_el2());
-		}
+	if (is_feat_hcx_supported()) {
+		write_ctx_reg(el2_sysregs_ctx, CTX_HCRX_EL2, read_hcrx_el2());
+	}
+	if (is_feat_tcr2_supported()) {
+		write_ctx_reg(el2_sysregs_ctx, CTX_TCR2_EL2, read_tcr2_el2());
+	}
+	if (is_feat_sxpie_supported()) {
+		write_ctx_reg(el2_sysregs_ctx, CTX_PIRE0_EL2, read_pire0_el2());
+		write_ctx_reg(el2_sysregs_ctx, CTX_PIR_EL2, read_pir_el2());
+	}
+	if (is_feat_s2pie_supported()) {
+		write_ctx_reg(el2_sysregs_ctx, CTX_S2PIR_EL2, read_s2pir_el2());
+	}
+	if (is_feat_sxpoe_supported()) {
+		write_ctx_reg(el2_sysregs_ctx, CTX_POR_EL2, read_por_el2());
+	}
+	if (is_feat_gcs_supported()) {
+		write_ctx_reg(el2_sysregs_ctx, CTX_GCSPR_EL2, read_gcspr_el2());
+		write_ctx_reg(el2_sysregs_ctx, CTX_GCSCR_EL2, read_gcscr_el2());
 	}
 }
 
@@ -1063,81 +1294,70 @@ void cm_el2_sysregs_context_save(uint32_t security_state)
  ******************************************************************************/
 void cm_el2_sysregs_context_restore(uint32_t security_state)
 {
-	u_register_t scr_el3 = read_scr();
+	cpu_context_t *ctx;
+	el2_sysregs_t *el2_sysregs_ctx;
 
-	/*
-	 * Always restore the non-secure and realm EL2 context, only restore the
-	 * S-EL2 context if S-EL2 is enabled.
-	 */
-	if ((security_state != SECURE) ||
-	    ((security_state == SECURE) && ((scr_el3 & SCR_EEL2_BIT) != 0U))) {
-		cpu_context_t *ctx;
-		el2_sysregs_t *el2_sysregs_ctx;
+	ctx = cm_get_context(security_state);
+	assert(ctx != NULL);
 
-		ctx = cm_get_context(security_state);
-		assert(ctx != NULL);
+	el2_sysregs_ctx = get_el2_sysregs_ctx(ctx);
 
-		el2_sysregs_ctx = get_el2_sysregs_ctx(ctx);
-
-		el2_sysregs_context_restore_common(el2_sysregs_ctx);
+	el2_sysregs_context_restore_common(el2_sysregs_ctx);
 #if CTX_INCLUDE_MTE_REGS
-		el2_sysregs_context_restore_mte(el2_sysregs_ctx);
+	write_tfsr_el2(read_ctx_reg(el2_sysregs_ctx, CTX_TFSR_EL2));
 #endif
-		if (is_feat_mpam_supported()) {
-			el2_sysregs_context_restore_mpam(el2_sysregs_ctx);
-		}
+	if (is_feat_mpam_supported()) {
+		el2_sysregs_context_restore_mpam(el2_sysregs_ctx);
+	}
 
-		if (is_feat_fgt_supported()) {
-			el2_sysregs_context_restore_fgt(el2_sysregs_ctx);
-		}
+	if (is_feat_fgt_supported()) {
+		el2_sysregs_context_restore_fgt(el2_sysregs_ctx);
+	}
 
-		if (is_feat_ecv_v2_supported()) {
-			write_cntpoff_el2(read_ctx_reg(el2_sysregs_ctx,
-						       CTX_CNTPOFF_EL2));
-		}
+	if (is_feat_ecv_v2_supported()) {
+		write_cntpoff_el2(read_ctx_reg(el2_sysregs_ctx, CTX_CNTPOFF_EL2));
+	}
 
-		if (is_feat_vhe_supported()) {
-			write_contextidr_el2(read_ctx_reg(el2_sysregs_ctx, CTX_CONTEXTIDR_EL2));
-			write_ttbr1_el2(read_ctx_reg(el2_sysregs_ctx, CTX_TTBR1_EL2));
-		}
+	if (is_feat_vhe_supported()) {
+		write_contextidr_el2(read_ctx_reg(el2_sysregs_ctx, CTX_CONTEXTIDR_EL2));
+		write_ttbr1_el2(read_ctx_reg(el2_sysregs_ctx, CTX_TTBR1_EL2));
+	}
 
-		if (is_feat_ras_supported()) {
-			write_vdisr_el2(read_ctx_reg(el2_sysregs_ctx, CTX_VDISR_EL2));
-			write_vsesr_el2(read_ctx_reg(el2_sysregs_ctx, CTX_VSESR_EL2));
-		}
+	if (is_feat_ras_supported()) {
+		write_vdisr_el2(read_ctx_reg(el2_sysregs_ctx, CTX_VDISR_EL2));
+		write_vsesr_el2(read_ctx_reg(el2_sysregs_ctx, CTX_VSESR_EL2));
+	}
 
-		if (is_feat_nv2_supported()) {
-			write_vncr_el2(read_ctx_reg(el2_sysregs_ctx, CTX_VNCR_EL2));
-		}
-		if (is_feat_trf_supported()) {
-			write_trfcr_el2(read_ctx_reg(el2_sysregs_ctx, CTX_TRFCR_EL2));
-		}
+	if (is_feat_nv2_supported()) {
+		write_vncr_el2(read_ctx_reg(el2_sysregs_ctx, CTX_VNCR_EL2));
+	}
+	if (is_feat_trf_supported()) {
+		write_trfcr_el2(read_ctx_reg(el2_sysregs_ctx, CTX_TRFCR_EL2));
+	}
 
-		if (is_feat_csv2_2_supported()) {
-			write_scxtnum_el2(read_ctx_reg(el2_sysregs_ctx,
-						       CTX_SCXTNUM_EL2));
-		}
+	if (is_feat_csv2_2_supported()) {
+		write_scxtnum_el2(read_ctx_reg(el2_sysregs_ctx, CTX_SCXTNUM_EL2));
+	}
 
-		if (is_feat_hcx_supported()) {
-			write_hcrx_el2(read_ctx_reg(el2_sysregs_ctx, CTX_HCRX_EL2));
-		}
-		if (is_feat_tcr2_supported()) {
-			write_tcr2_el2(read_ctx_reg(el2_sysregs_ctx, CTX_TCR2_EL2));
-		}
-		if (is_feat_sxpie_supported()) {
-			write_pire0_el2(read_ctx_reg(el2_sysregs_ctx, CTX_PIRE0_EL2));
-			write_pir_el2(read_ctx_reg(el2_sysregs_ctx, CTX_PIR_EL2));
-		}
-		if (is_feat_s2pie_supported()) {
-			write_s2pir_el2(read_ctx_reg(el2_sysregs_ctx, CTX_S2PIR_EL2));
-		}
-		if (is_feat_sxpoe_supported()) {
-			write_por_el2(read_ctx_reg(el2_sysregs_ctx, CTX_POR_EL2));
-		}
-		if (is_feat_gcs_supported()) {
-			write_gcscr_el2(read_ctx_reg(el2_sysregs_ctx, CTX_GCSCR_EL2));
-			write_gcspr_el2(read_ctx_reg(el2_sysregs_ctx, CTX_GCSPR_EL2));
-		}
+	if (is_feat_hcx_supported()) {
+		write_hcrx_el2(read_ctx_reg(el2_sysregs_ctx, CTX_HCRX_EL2));
+	}
+	if (is_feat_tcr2_supported()) {
+		write_tcr2_el2(read_ctx_reg(el2_sysregs_ctx, CTX_TCR2_EL2));
+	}
+	if (is_feat_sxpie_supported()) {
+		write_pire0_el2(read_ctx_reg(el2_sysregs_ctx, CTX_PIRE0_EL2));
+		write_pir_el2(read_ctx_reg(el2_sysregs_ctx, CTX_PIR_EL2));
+	}
+	if (is_feat_s2pie_supported()) {
+		write_s2pir_el2(read_ctx_reg(el2_sysregs_ctx, CTX_S2PIR_EL2));
+	}
+	if (is_feat_sxpoe_supported()) {
+		write_por_el2(read_ctx_reg(el2_sysregs_ctx, CTX_POR_EL2));
+	}
+	if (is_feat_gcs_supported()) {
+		write_gcscr_el2(read_ctx_reg(el2_sysregs_ctx, CTX_GCSCR_EL2));
+		write_gcspr_el2(read_ctx_reg(el2_sysregs_ctx, CTX_GCSPR_EL2));
 	}
 }
 #endif /* CTX_INCLUDE_EL2_REGS */
@@ -1151,35 +1371,15 @@ void cm_el2_sysregs_context_restore(uint32_t security_state)
 void cm_prepare_el3_exit_ns(void)
 {
 #if CTX_INCLUDE_EL2_REGS
+#if ENABLE_ASSERTIONS
 	cpu_context_t *ctx = cm_get_context(NON_SECURE);
 	assert(ctx != NULL);
 
 	/* Assert that EL2 is used. */
-#if ENABLE_ASSERTIONS
-	el3_state_t *state = get_el3state_ctx(ctx);
-	u_register_t scr_el3 = read_ctx_reg(state, CTX_SCR_EL3);
-#endif
+	u_register_t scr_el3 = read_ctx_reg(get_el3state_ctx(ctx), CTX_SCR_EL3);
 	assert(((scr_el3 & SCR_HCE_BIT) != 0UL) &&
 			(el_implemented(2U) != EL_IMPL_NONE));
-
-	/*
-	 * Currently some extensions are configured using
-	 * direct register updates. Therefore, do this here
-	 * instead of when setting up context.
-	 */
-	manage_extensions_nonsecure(0, ctx);
-
-	/*
-	 * Set the NS bit to be able to access the ICC_SRE_EL2
-	 * register when restoring context.
-	 */
-	write_scr_el3(read_scr_el3() | SCR_NS_BIT);
-
-	/*
-	 * Ensure the NS bit change is committed before the EL2/EL1
-	 * state restoration.
-	 */
-	isb();
+#endif /* ENABLE_ASSERTIONS */
 
 	/* Restore EL2 and EL1 sysreg contexts */
 	cm_el2_sysregs_context_restore(NON_SECURE);

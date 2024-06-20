@@ -286,7 +286,6 @@ extern const spd_pm_ops_t *psci_spd_pm;
 int psci_validate_power_state(unsigned int power_state,
 			      psci_power_state_t *state_info);
 void psci_query_sys_suspend_pwrstate(psci_power_state_t *state_info);
-int psci_validate_mpidr(u_register_t mpidr);
 void psci_init_req_local_pwr_states(void);
 #if PSCI_OS_INIT_MODE
 void psci_update_req_local_pwr_states(unsigned int end_pwrlvl,
@@ -298,6 +297,8 @@ void psci_restore_req_local_pwr_states(unsigned int cpu_idx,
 #endif
 void psci_get_target_local_pwr_states(unsigned int end_pwrlvl,
 				      psci_power_state_t *target_state);
+void psci_set_target_local_pwr_states(unsigned int end_pwrlvl,
+				      const psci_power_state_t *target_state);
 int psci_validate_entry_point(entry_point_info_t *ep,
 			uintptr_t entrypoint, u_register_t context_id);
 void psci_get_parent_pwr_domain_nodes(unsigned int cpu_idx,

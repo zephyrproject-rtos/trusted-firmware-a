@@ -52,7 +52,7 @@ are explained below:
   - ``RES0``: Bit 31 of the version number is reserved 0 as to maintain
     consistency with the versioning schemes used in other parts of RMM.
 
-This document specifies the 0.1 version of Boot Interface ABI and RMM-EL3
+This document specifies the 0.2 version of Boot Interface ABI and RMM-EL3
 services specification and the 0.2 version of the Boot Manifest.
 
 .. _rmm_el3_boot_interface:
@@ -159,8 +159,8 @@ as per the following table:
    ``E_RMM_BOOT_SUCCESS``,Boot successful,0
    ``E_RMM_BOOT_ERR_UNKNOWN``,Unknown error,-1
    ``E_RMM_BOOT_VERSION_NOT_VALID``,Boot Interface version reported by EL3 is not supported by RMM,-2
-   ``E_RMM_BOOT_CPUS_OUT_OF_RAGE``,Number of CPUs reported by EL3 larger than maximum supported by RMM,-3
-   ``E_RMM_BOOT_CPU_ID_OUT_OF_RAGE``,Current CPU Id is higher or equal than the number of CPUs supported by RMM,-4
+   ``E_RMM_BOOT_CPUS_OUT_OF_RANGE``,Number of CPUs reported by EL3 larger than maximum supported by RMM,-3
+   ``E_RMM_BOOT_CPU_ID_OUT_OF_RANGE``,Current CPU Id is higher or equal than the number of CPUs supported by RMM,-4
    ``E_RMM_BOOT_INVALID_SHARED_BUFFER``,Invalid pointer to shared memory area,-5
    ``E_RMM_BOOT_MANIFEST_VERSION_NOT_SUPPORTED``,Version reported by the Boot Manifest not supported by RMM,-6
    ``E_RMM_BOOT_MANIFEST_DATA_ERROR``,Error parsing core Boot Manifest,-7
@@ -503,6 +503,10 @@ As per SMCCCv1.2, x4 must be preserved if not being used as return argument by t
 and it is the responsibility of RMM to preserve this or use this as a return argument.
 EL3 will always copy x0-x4 from Realm context to NS Context.
 
+EL3 must save and restore the following as part of world switch:
+   #. EL2 system registers with the exception of ``zcr_el2`` register.
+   #. PAuth key registers (APIA, APIB, APDA, APDB, APGA).
+
 EL3 will not save some registers as mentioned in the below list. It is the
 responsibility of RMM to ensure that these are appropriately saved if the
 Realm World makes use of them:
@@ -510,10 +514,11 @@ Realm World makes use of them:
    #. FP/SIMD registers
    #. SVE registers
    #. SME registers
-   #. EL1/0 registers
+   #. EL1/0 registers with the exception of PAuth key registers as mentioned above.
+   #. zcr_el2 register.
 
-It is the responsibility of EL3 that any other registers other than the ones mentioned above
-will not be leaked to the NS Host and to maintain the confidentiality of the Realm World.
+It is essential that EL3 honors this contract to maintain the Confidentiality and integrity
+of the Realm world.
 
 SMCCC v1.3 allows NS world to specify whether SVE context is in use. In this
 case, RMM could choose to not save the incoming SVE context but must ensure

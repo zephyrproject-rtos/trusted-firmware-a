@@ -20,7 +20,7 @@ override WARMBOOT_ENABLE_DCACHE_EARLY := 1
 EL3_EXCEPTION_HANDLING := $(SDEI_SUPPORT)
 
 # pncd SPD requires secure SGI to be handled at EL1
-ifeq (${SPD},pncd)
+ifeq (${SPD}, $(filter ${SPD},pncd tspd))
 ifeq (${ZYNQMP_WDT_RESTART},1)
 $(error "Error: ZYNQMP_WDT_RESTART and SPD=pncd are incompatible")
 endif
@@ -49,6 +49,10 @@ ifdef ZYNQMP_ATF_MEM_BASE
     ifdef ZYNQMP_ATF_MEM_PROGBITS_SIZE
         $(eval $(call add_define,ZYNQMP_ATF_MEM_PROGBITS_SIZE))
     endif
+
+    # enable assert() when TF-A runs from DDR memory.
+    ENABLE_ASSERTIONS := 1
+
 endif
 
 ifdef ZYNQMP_BL32_MEM_BASE
@@ -124,9 +128,12 @@ BL31_SOURCES		+=	drivers/arm/cci/cci.c				\
 				lib/cpus/aarch64/cortex_a53.S			\
 				plat/common/plat_psci_common.c			\
 				common/fdt_fixup.c				\
+				common/fdt_wrappers.c				\
 				${LIBFDT_SRCS}					\
 				plat/xilinx/common/ipi_mailbox_service/ipi_mailbox_svc.c \
 				plat/xilinx/common/plat_startup.c		\
+				plat/xilinx/common/plat_console.c		\
+				plat/xilinx/common/plat_fdt.c			\
 				plat/xilinx/zynqmp/bl31_zynqmp_setup.c		\
 				plat/xilinx/zynqmp/plat_psci.c			\
 				plat/xilinx/zynqmp/plat_zynqmp.c		\

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2023, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2016-2023, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -20,7 +20,7 @@
 						SMCCC_VERSION_MINOR_SHIFT))
 
 #define SMCCC_MAJOR_VERSION U(1)
-#define SMCCC_MINOR_VERSION U(2)
+#define SMCCC_MINOR_VERSION U(4)
 
 /*******************************************************************************
  * Bit definitions inside the function id as per the SMC calling convention

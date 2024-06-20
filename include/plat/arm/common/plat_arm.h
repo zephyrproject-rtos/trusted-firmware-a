@@ -39,7 +39,21 @@ typedef struct arm_tzc_regions_info {
  *   - Region 1 with secure access only;
  *   - the remaining DRAM regions access from the given Non-Secure masters.
  ******************************************************************************/
-#if SPM_MM
+
+#if ENABLE_RME
+#define ARM_TZC_RME_REGIONS_DEF						    \
+	{ARM_AP_TZC_DRAM1_BASE, ARM_AP_TZC_DRAM1_END, TZC_REGION_S_RDWR, 0},\
+	{ARM_EL3_TZC_DRAM1_BASE, ARM_L1_GPT_END, TZC_REGION_S_RDWR, 0},	    \
+	{ARM_NS_DRAM1_BASE, ARM_NS_DRAM1_END, ARM_TZC_NS_DRAM_S_ACCESS,	    \
+		PLAT_ARM_TZC_NS_DEV_ACCESS},				    \
+	/* Realm and Shared area share the same PAS */		    \
+	{ARM_REALM_BASE, ARM_EL3_RMM_SHARED_END, ARM_TZC_NS_DRAM_S_ACCESS,  \
+		PLAT_ARM_TZC_NS_DEV_ACCESS},				    \
+	{ARM_DRAM2_BASE, ARM_DRAM2_END, ARM_TZC_NS_DRAM_S_ACCESS,	    \
+		PLAT_ARM_TZC_NS_DEV_ACCESS}
+#endif
+
+#if SPM_MM || (SPMC_AT_EL3 && SPMC_AT_EL3_SEL0_SP)
 #define ARM_TZC_REGIONS_DEF						\
 	{ARM_AP_TZC_DRAM1_BASE, ARM_EL3_TZC_DRAM1_END + ARM_L1_GPT_SIZE,\
 		TZC_REGION_S_RDWR, 0},					\
@@ -52,16 +66,16 @@ typedef struct arm_tzc_regions_info {
 		PLAT_ARM_TZC_NS_DEV_ACCESS}
 
 #elif ENABLE_RME
-#define ARM_TZC_REGIONS_DEF						    \
-	{ARM_AP_TZC_DRAM1_BASE, ARM_AP_TZC_DRAM1_END, TZC_REGION_S_RDWR, 0},\
-	{ARM_EL3_TZC_DRAM1_BASE, ARM_L1_GPT_END, TZC_REGION_S_RDWR, 0},	    \
-	{ARM_NS_DRAM1_BASE, ARM_NS_DRAM1_END, ARM_TZC_NS_DRAM_S_ACCESS,	    \
-		PLAT_ARM_TZC_NS_DEV_ACCESS},				    \
-	/* Realm and Shared area share the same PAS */		    \
-	{ARM_REALM_BASE, ARM_EL3_RMM_SHARED_END, ARM_TZC_NS_DRAM_S_ACCESS,  \
-		PLAT_ARM_TZC_NS_DEV_ACCESS},				    \
-	{ARM_DRAM2_BASE, ARM_DRAM2_END, ARM_TZC_NS_DRAM_S_ACCESS,	    \
-		PLAT_ARM_TZC_NS_DEV_ACCESS}
+#if (defined(SPD_tspd) || defined(SPD_opteed) || defined(SPD_spmd)) &&  \
+MEASURED_BOOT
+#define ARM_TZC_REGIONS_DEF					        \
+	ARM_TZC_RME_REGIONS_DEF,					\
+	{ARM_EVENT_LOG_DRAM1_BASE, ARM_EVENT_LOG_DRAM1_END,             \
+		TZC_REGION_S_RDWR, 0}
+#else
+#define ARM_TZC_REGIONS_DEF					        \
+	ARM_TZC_RME_REGIONS_DEF
+#endif
 
 #else
 #define ARM_TZC_REGIONS_DEF						\
@@ -162,10 +176,17 @@ void arm_setup_romlib(void);
 #define STATE_SW_E_DENIED		(-3)
 
 /* plat_get_rotpk_info() flags */
-#define ARM_ROTPK_REGS_ID		1
-#define ARM_ROTPK_DEVEL_RSA_ID		2
-#define ARM_ROTPK_DEVEL_ECDSA_ID	3
+#define ARM_ROTPK_REGS_ID			1
+#define ARM_ROTPK_DEVEL_RSA_ID			2
+#define ARM_ROTPK_DEVEL_ECDSA_ID		3
 #define ARM_ROTPK_DEVEL_FULL_DEV_RSA_KEY_ID	4
+#define ARM_ROTPK_DEVEL_FULL_DEV_ECDSA_KEY_ID	5
+
+#define ARM_USE_DEVEL_ROTPK							\
+	(ARM_ROTPK_LOCATION_ID == ARM_ROTPK_DEVEL_RSA_ID) ||			\
+	(ARM_ROTPK_LOCATION_ID == ARM_ROTPK_DEVEL_ECDSA_ID) ||			\
+	(ARM_ROTPK_LOCATION_ID == ARM_ROTPK_DEVEL_FULL_DEV_RSA_KEY_ID) ||	\
+	(ARM_ROTPK_LOCATION_ID == ARM_ROTPK_DEVEL_FULL_DEV_ECDSA_KEY_ID)
 
 /* IO storage utility functions */
 int arm_io_setup(void);

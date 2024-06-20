@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2020, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2013-2020, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -11,8 +11,8 @@
 #include <arch_helpers.h>
 #include <common/bl_common.h>
 #include <context.h>
+#include <lib/cpus/errata.h>
 #include <lib/el3_runtime/context_mgmt.h>
-#include <lib/cpus/errata_report.h>
 #include <plat/common/platform.h>
 
 #include "psci_private.h"

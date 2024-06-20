@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2022, Arm Limited. All rights reserved.
+ * Copyright (c) 2021-2023, Arm Limited. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -9,6 +9,7 @@
 #include <drivers/measured_boot/event_log/event_log.h>
 #include <drivers/measured_boot/rss/rss_measured_boot.h>
 #include <plat/arm/common/plat_arm.h>
+#include <tools_share/zero_oid.h>
 
 /* Event Log data */
 static uint8_t event_log[PLAT_ARM_EVENT_LOG_MAX_SIZE];
@@ -31,18 +32,21 @@ struct rss_mboot_metadata fvp_rss_mboot_metadata[] = {
 		.slot = U(6),
 		.signer_id_size = SIGNER_ID_MIN_SIZE,
 		.sw_type = RSS_MBOOT_FW_CONFIG_STRING,
+		.pk_oid = ZERO_OID,
 		.lock_measurement = true },
 	{
 		.id = TB_FW_CONFIG_ID,
 		.slot = U(7),
 		.signer_id_size = SIGNER_ID_MIN_SIZE,
 		.sw_type = RSS_MBOOT_TB_FW_CONFIG_STRING,
+		.pk_oid = ZERO_OID,
 		.lock_measurement = true },
 	{
 		.id = BL2_IMAGE_ID,
 		.slot = U(8),
 		.signer_id_size = SIGNER_ID_MIN_SIZE,
 		.sw_type = RSS_MBOOT_BL2_STRING,
+		.pk_oid = ZERO_OID,
 		.lock_measurement = true },
 
 	{
@@ -54,7 +58,7 @@ void bl1_plat_mboot_init(void)
 	event_log_init(event_log, event_log + sizeof(event_log));
 	event_log_write_header();
 
-	rss_measured_boot_init();
+	rss_measured_boot_init(fvp_rss_mboot_metadata);
 }
 
 void bl1_plat_mboot_finish(void)

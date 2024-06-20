@@ -13,12 +13,6 @@
 #include <plat/common/common_def.h>
 
 #define MAX_INTR_EL3			2
-/* This part is taken from U-Boot project under GPL that's why dual license above */
-#define __bf_shf(x) (__builtin_ffsll(x) - 1U)
-#define FIELD_GET(_mask, _reg)						\
-	({								\
-		(typeof(_mask))(((_reg) & (_mask)) >> __bf_shf(_mask));	\
-	})
 
 /* List all consoles */
 #define VERSAL_NET_CONSOLE_ID_pl011	U(1)
@@ -26,7 +20,7 @@
 #define VERSAL_NET_CONSOLE_ID_pl011_1	U(2)
 #define VERSAL_NET_CONSOLE_ID_dcc	U(3)
 
-#define VERSAL_NET_CONSOLE_IS(con)	(VERSAL_NET_CONSOLE_ID_ ## con == VERSAL_NET_CONSOLE)
+#define CONSOLE_IS(con)	(VERSAL_NET_CONSOLE_ID_ ## con == VERSAL_NET_CONSOLE)
 
 /* List all platforms */
 #define VERSAL_NET_SILICON		U(0)
@@ -134,6 +128,7 @@
  * IRQ constants
  ******************************************************************************/
 #define VERSAL_NET_IRQ_SEC_PHY_TIMER	U(29)
+#define ARM_IRQ_SEC_PHY_TIMER	29
 
 /*******************************************************************************
  * UART related constants
@@ -141,35 +136,14 @@
 #define VERSAL_NET_UART0_BASE		U(0xF1920000)
 #define VERSAL_NET_UART1_BASE		U(0xF1930000)
 
-#define VERSAL_NET_UART_BAUDRATE	115200
+#define UART_BAUDRATE	115200
 
-#if VERSAL_NET_CONSOLE_IS(pl011_1)
-#define VERSAL_NET_UART_BASE		VERSAL_NET_UART1_BASE
+#if CONSOLE_IS(pl011_1)
+#define UART_BASE		VERSAL_NET_UART1_BASE
 #else
 /* Default console is UART0 */
-#define VERSAL_NET_UART_BASE            VERSAL_NET_UART0_BASE
+#define UART_BASE            VERSAL_NET_UART0_BASE
 #endif
-
-#define PLAT_VERSAL_NET_CRASH_UART_BASE		VERSAL_NET_UART_BASE
-#define PLAT_VERSAL_NET_CRASH_UART_CLK_IN_HZ	VERSAL_NET_UART_CLOCK
-#define VERSAL_NET_CONSOLE_BAUDRATE		VERSAL_NET_UART_BAUDRATE
-
-/*******************************************************************************
- * IPI registers and bitfields
- ******************************************************************************/
-#define IPI0_REG_BASE		(0xEB330000U)
-#define IPI0_TRIG_BIT		(1 << 2)
-#define PMC_IPI_TRIG_BIT	(1 << 1)
-#define IPI1_REG_BASE		(0xEB340000U)
-#define IPI1_TRIG_BIT		(1 << 3)
-#define IPI2_REG_BASE		(0xEB350000U)
-#define IPI2_TRIG_BIT		(1 << 4)
-#define IPI3_REG_BASE		(0xEB360000U)
-#define IPI3_TRIG_BIT		(1 << 5)
-#define IPI4_REG_BASE		(0xEB370000U)
-#define IPI4_TRIG_BIT		(1 << 6)
-#define IPI5_REG_BASE		(0xEB380000U)
-#define IPI5_TRIG_BIT		(1 << 7)
 
 /* Processor core device IDs */
 #define PM_DEV_CLUSTER0_ACPU_0	(0x1810C0AFU)

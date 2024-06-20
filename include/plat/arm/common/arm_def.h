@@ -24,8 +24,6 @@
  */
 #define ARM_ROTPK_HEADER_LEN		19
 #define ARM_ROTPK_HASH_LEN		32
-/* ARM_ROTPK_KEY_LEN includes DER header + raw key material */
-#define ARM_ROTPK_KEY_LEN		294
 
 /* Special value used to verify platform parameters from BL2 to BL31 */
 #define ARM_BL31_PLAT_PARAM_VAL		ULL(0x0f1e2d3c4b5a6978)
@@ -198,16 +196,7 @@ MEASURED_BOOT
 					ARM_AP_TZC_DRAM1_SIZE - 1U)
 
 /* Define the Access permissions for Secure peripherals to NS_DRAM */
-#if ARM_CRYPTOCELL_INTEG
-/*
- * Allow Secure peripheral to read NS DRAM when integrated with CryptoCell.
- * This is required by CryptoCell to authenticate BL33 which is loaded
- * into the Non Secure DDR.
- */
-#define ARM_TZC_NS_DRAM_S_ACCESS	TZC_REGION_S_RD
-#else
 #define ARM_TZC_NS_DRAM_S_ACCESS	TZC_REGION_S_NONE
-#endif
 
 #ifdef SPD_opteed
 /*
@@ -539,7 +528,8 @@ MEASURED_BOOT
  * Define limit of firmware configuration memory:
  * ARM_FW_CONFIG + ARM_BL2_MEM_DESC memory
  */
-#define ARM_FW_CONFIGS_LIMIT		(ARM_BL_RAM_BASE + (PAGE_SIZE * 2))
+#define ARM_FW_CONFIGS_SIZE		(PAGE_SIZE * 2)
+#define ARM_FW_CONFIGS_LIMIT		(ARM_BL_RAM_BASE + ARM_FW_CONFIGS_SIZE)
 
 #if ENABLE_RME
 /*
@@ -592,15 +582,15 @@ MEASURED_BOOT
  * As the BL31 image size appears to be increased when built with the ENABLE_PIE
  * option, set BL2 base address to have enough space for BL31 in Trusted SRAM.
  */
-#define BL2_BASE			(ARM_TRUSTED_SRAM_BASE + \
-					(PLAT_ARM_TRUSTED_SRAM_SIZE >> 1) + \
-					0x3000)
+#define BL2_OFFSET			(0x5000)
 #else
 /* Put BL2 towards the middle of the Trusted SRAM */
-#define BL2_BASE			(ARM_TRUSTED_SRAM_BASE + \
-					(PLAT_ARM_TRUSTED_SRAM_SIZE >> 1) + \
-					0x2000)
+#define BL2_OFFSET			(0x2000)
 #endif /* ENABLE_PIE */
+
+#define BL2_BASE			(ARM_TRUSTED_SRAM_BASE + \
+					    (PLAT_ARM_TRUSTED_SRAM_SIZE >> 1) + \
+					    BL2_OFFSET)
 #define BL2_LIMIT			(ARM_BL_RAM_BASE + ARM_BL_RAM_SIZE)
 
 #else
@@ -775,9 +765,14 @@ MEASURED_BOOT
 #define PLAT_PERCPU_BAKERY_LOCK_SIZE		(1 * CACHE_WRITEBACK_GRANULE)
 
 /* Priority levels for ARM platforms */
+#if ENABLE_FEAT_RAS && FFH_SUPPORT
 #define PLAT_RAS_PRI			0x10
+#endif
 #define PLAT_SDEI_CRITICAL_PRI		0x60
 #define PLAT_SDEI_NORMAL_PRI		0x70
+
+/* CPU Fault Handling Interrupt(FHI) PPI interrupt ID */
+#define PLAT_CORE_FAULT_IRQ		17
 
 /* ARM platforms use 3 upper bits of secure interrupt priority */
 #define PLAT_PRI_BITS			3

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2022, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2015-2023, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -151,8 +151,16 @@
  * current BL3-1 debug size plus a little space for growth.
  */
 #define BL31_BASE			(BL31_LIMIT - 0x60000)
-#define BL31_LIMIT			(BL_RAM_BASE + BL_RAM_SIZE)
+#define BL31_LIMIT			(BL_RAM_BASE + BL_RAM_SIZE - FW_HANDOFF_SIZE)
 #define BL31_PROGBITS_LIMIT		BL1_RW_BASE
+
+#if TRANSFER_LIST
+#define FW_HANDOFF_BASE			BL31_LIMIT
+#define FW_HANDOFF_LIMIT		(FW_HANDOFF_BASE + FW_HANDOFF_SIZE)
+#define FW_HANDOFF_SIZE			0x4000
+#else
+#define FW_HANDOFF_SIZE			0
+#endif
 
 
 /*
@@ -172,14 +180,18 @@
 # define BL32_MEM_BASE			BL_RAM_BASE
 # define BL32_MEM_SIZE			BL_RAM_SIZE
 # define BL32_BASE			BL32_SRAM_BASE
-# define BL32_LIMIT			BL32_SRAM_LIMIT
+# define BL32_LIMIT			(BL32_SRAM_LIMIT - FW_HANDOFF_SIZE)
 #elif BL32_RAM_LOCATION_ID == SEC_DRAM_ID
 # define BL32_MEM_BASE			SEC_DRAM_BASE
 # define BL32_MEM_SIZE			SEC_DRAM_SIZE
 # define BL32_BASE			BL32_DRAM_BASE
-# define BL32_LIMIT			BL32_DRAM_LIMIT
+# define BL32_LIMIT			(BL32_DRAM_LIMIT - FW_HANDOFF_SIZE)
 #else
 # error "Unsupported BL32_RAM_LOCATION_ID value"
+#endif
+
+#if TRANSFER_LIST
+#define FW_NS_HANDOFF_BASE		(NS_IMAGE_OFFSET - FW_HANDOFF_SIZE)
 #endif
 
 #define NS_IMAGE_OFFSET			(NS_DRAM0_BASE + 0x20000000)
@@ -244,8 +256,7 @@
  * interrupts.
  *****************************************************************************/
 #define PLATFORM_G1S_PROPS(grp)						\
-	INTR_PROP_DESC(QEMU_IRQ_SEC_SGI_0, GIC_HIGHEST_SEC_PRIORITY,	\
-					   grp, GIC_INTR_CFG_EDGE),	\
+	DESC_G1S_IRQ_SEC_SGI_0(grp)					\
 	INTR_PROP_DESC(QEMU_IRQ_SEC_SGI_1, GIC_HIGHEST_SEC_PRIORITY,	\
 					   grp, GIC_INTR_CFG_EDGE),	\
 	INTR_PROP_DESC(QEMU_IRQ_SEC_SGI_2, GIC_HIGHEST_SEC_PRIORITY,	\
@@ -261,13 +272,33 @@
 	INTR_PROP_DESC(QEMU_IRQ_SEC_SGI_7, GIC_HIGHEST_SEC_PRIORITY,	\
 					   grp, GIC_INTR_CFG_EDGE)
 
-#define PLATFORM_G0_PROPS(grp)
+#if SDEI_SUPPORT
+#define DESC_G0_IRQ_SEC_SGI(grp)					\
+	INTR_PROP_DESC(QEMU_IRQ_SEC_SGI_0, PLAT_SDEI_NORMAL_PRI, (grp), \
+					   GIC_INTR_CFG_EDGE)
+#define DESC_G1S_IRQ_SEC_SGI_0(grp)
+#else
+#define DESC_G0_IRQ_SEC_SGI(grp)
+#define DESC_G1S_IRQ_SEC_SGI_0(grp)					\
+	INTR_PROP_DESC(QEMU_IRQ_SEC_SGI_0, PLAT_SDEI_NORMAL_PRI, (grp),	\
+					   GIC_INTR_CFG_EDGE),
+#endif
+
+#define PLATFORM_G0_PROPS(grp)		DESC_G0_IRQ_SEC_SGI(grp)
 
 /*
  * DT related constants
  */
 #define PLAT_QEMU_DT_BASE		NS_DRAM0_BASE
 #define PLAT_QEMU_DT_MAX_SIZE		0x100000
+
+/*
+ * Platforms macros to support SDEI
+ */
+#define PLAT_PRI_BITS			U(3)
+#define PLAT_SDEI_CRITICAL_PRI		0x60
+#define PLAT_SDEI_NORMAL_PRI		0x70
+#define PLAT_SDEI_SGI_PRIVATE		QEMU_IRQ_SEC_SGI_0
 
 /*
  * System counter

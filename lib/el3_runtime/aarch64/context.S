@@ -10,15 +10,6 @@
 #include <context.h>
 #include <el3_common_macros.S>
 
-#if CTX_INCLUDE_EL2_REGS
-	.global	el2_sysregs_context_save_common
-	.global	el2_sysregs_context_restore_common
-#if CTX_INCLUDE_MTE_REGS
-	.global	el2_sysregs_context_save_mte
-	.global	el2_sysregs_context_restore_mte
-#endif /* CTX_INCLUDE_MTE_REGS */
-#endif /* CTX_INCLUDE_EL2_REGS */
-
 	.global	el1_sysregs_context_save
 	.global	el1_sysregs_context_restore
 #if CTX_INCLUDE_FPREGS
@@ -30,183 +21,6 @@
 	.global save_and_update_ptw_el1_sys_regs
 	.global	el3_exit
 
-#if CTX_INCLUDE_EL2_REGS
-
-/* -----------------------------------------------------
- * The following functions strictly follow the AArch64
- * PCS to use x9-x16 (temporary caller-saved registers)
- * to save/restore EL2 system register context.
- * el2_sysregs_context_save/restore_common functions
- * save and restore registers that are common to all
- * configurations. The rest of the functions save and
- * restore EL2 system registers that are present when a
- * particular feature is enabled. All functions assume
- * that 'x0' is pointing to a 'el2_sys_regs' structure
- * where the register context will be saved/restored.
- *
- * The following registers are not added.
- * AMEVCNTVOFF0<n>_EL2
- * AMEVCNTVOFF1<n>_EL2
- * ICH_AP0R<n>_EL2
- * ICH_AP1R<n>_EL2
- * ICH_LR<n>_EL2
- * -----------------------------------------------------
- */
-func el2_sysregs_context_save_common
-	mrs	x9, actlr_el2
-	mrs	x10, afsr0_el2
-	stp	x9, x10, [x0, #CTX_ACTLR_EL2]
-
-	mrs	x11, afsr1_el2
-	mrs	x12, amair_el2
-	stp	x11, x12, [x0, #CTX_AFSR1_EL2]
-
-	mrs	x13, cnthctl_el2
-	mrs	x14, cntvoff_el2
-	stp	x13, x14, [x0, #CTX_CNTHCTL_EL2]
-
-	mrs	x15, cptr_el2
-	str	x15, [x0, #CTX_CPTR_EL2]
-
-#if CTX_INCLUDE_AARCH32_REGS
-	mrs	x16, dbgvcr32_el2
-	str	x16, [x0, #CTX_DBGVCR32_EL2]
-#endif /* CTX_INCLUDE_AARCH32_REGS */
-
-	mrs	x9, elr_el2
-	mrs	x10, esr_el2
-	stp	x9, x10, [x0, #CTX_ELR_EL2]
-
-	mrs	x11, far_el2
-	mrs	x12, hacr_el2
-	stp	x11, x12, [x0, #CTX_FAR_EL2]
-
-	mrs	x13, hcr_el2
-	mrs	x14, hpfar_el2
-	stp	x13, x14, [x0, #CTX_HCR_EL2]
-
-	mrs	x15, hstr_el2
-	mrs	x16, ICC_SRE_EL2
-	stp	x15, x16, [x0, #CTX_HSTR_EL2]
-
-	mrs	x9, ICH_HCR_EL2
-	mrs	x10, ICH_VMCR_EL2
-	stp	x9, x10, [x0, #CTX_ICH_HCR_EL2]
-
-	mrs	x11, mair_el2
-	mrs	x12, mdcr_el2
-	stp	x11, x12, [x0, #CTX_MAIR_EL2]
-
-	mrs	x14, sctlr_el2
-	str	x14, [x0, #CTX_SCTLR_EL2]
-
-	mrs	x15, spsr_el2
-	mrs	x16, sp_el2
-	stp	x15, x16, [x0, #CTX_SPSR_EL2]
-
-	mrs	x9, tcr_el2
-	mrs	x10, tpidr_el2
-	stp	x9, x10, [x0, #CTX_TCR_EL2]
-
-	mrs	x11, ttbr0_el2
-	mrs	x12, vbar_el2
-	stp	x11, x12, [x0, #CTX_TTBR0_EL2]
-
-	mrs	x13, vmpidr_el2
-	mrs	x14, vpidr_el2
-	stp	x13, x14, [x0, #CTX_VMPIDR_EL2]
-
-	mrs	x15, vtcr_el2
-	mrs	x16, vttbr_el2
-	stp	x15, x16, [x0, #CTX_VTCR_EL2]
-	ret
-endfunc el2_sysregs_context_save_common
-
-func el2_sysregs_context_restore_common
-	ldp	x9, x10, [x0, #CTX_ACTLR_EL2]
-	msr	actlr_el2, x9
-	msr	afsr0_el2, x10
-
-	ldp	x11, x12, [x0, #CTX_AFSR1_EL2]
-	msr	afsr1_el2, x11
-	msr	amair_el2, x12
-
-	ldp	x13, x14, [x0, #CTX_CNTHCTL_EL2]
-	msr	cnthctl_el2, x13
-	msr	cntvoff_el2, x14
-
-	ldr	x15, [x0, #CTX_CPTR_EL2]
-	msr	cptr_el2, x15
-
-#if CTX_INCLUDE_AARCH32_REGS
-	ldr	x16, [x0, #CTX_DBGVCR32_EL2]
-	msr	dbgvcr32_el2, x16
-#endif /* CTX_INCLUDE_AARCH32_REGS */
-
-	ldp	x9, x10, [x0, #CTX_ELR_EL2]
-	msr	elr_el2, x9
-	msr	esr_el2, x10
-
-	ldp	x11, x12, [x0, #CTX_FAR_EL2]
-	msr	far_el2, x11
-	msr	hacr_el2, x12
-
-	ldp	x13, x14, [x0, #CTX_HCR_EL2]
-	msr	hcr_el2, x13
-	msr	hpfar_el2, x14
-
-	ldp	x15, x16, [x0, #CTX_HSTR_EL2]
-	msr	hstr_el2, x15
-	msr	ICC_SRE_EL2, x16
-
-	ldp	x9, x10, [x0, #CTX_ICH_HCR_EL2]
-	msr	ICH_HCR_EL2, x9
-	msr	ICH_VMCR_EL2, x10
-
-	ldp	x11, x12, [x0, #CTX_MAIR_EL2]
-	msr	mair_el2, x11
-	msr	mdcr_el2, x12
-
-	ldr	x14, [x0, #CTX_SCTLR_EL2]
-	msr	sctlr_el2, x14
-
-	ldp	x15, x16, [x0, #CTX_SPSR_EL2]
-	msr	spsr_el2, x15
-	msr	sp_el2, x16
-
-	ldp	x9, x10, [x0, #CTX_TCR_EL2]
-	msr	tcr_el2, x9
-	msr	tpidr_el2, x10
-
-	ldp	x11, x12, [x0, #CTX_TTBR0_EL2]
-	msr	ttbr0_el2, x11
-	msr	vbar_el2, x12
-
-	ldp	x13, x14, [x0, #CTX_VMPIDR_EL2]
-	msr	vmpidr_el2, x13
-	msr	vpidr_el2, x14
-
-	ldp	x15, x16, [x0, #CTX_VTCR_EL2]
-	msr	vtcr_el2, x15
-	msr	vttbr_el2, x16
-	ret
-endfunc el2_sysregs_context_restore_common
-
-#if CTX_INCLUDE_MTE_REGS
-func el2_sysregs_context_save_mte
-	mrs	x9, TFSR_EL2
-	str	x9, [x0, #CTX_TFSR_EL2]
-	ret
-endfunc el2_sysregs_context_save_mte
-
-func el2_sysregs_context_restore_mte
-	ldr	x9, [x0, #CTX_TFSR_EL2]
-	msr	TFSR_EL2, x9
-	ret
-endfunc el2_sysregs_context_restore_mte
-#endif /* CTX_INCLUDE_MTE_REGS */
-
-#endif /* CTX_INCLUDE_EL2_REGS */
 
 /* ------------------------------------------------------------------
  * The following function strictly follows the AArch64 PCS to use
@@ -536,6 +350,43 @@ endfunc fpregs_context_restore
 #endif /* ENABLE_FEAT_DIT */
 	.endm /* set_unset_pstate_bits */
 
+/*-------------------------------------------------------------------------
+ * This macro checks the ENABLE_FEAT_MPAM state, performs ID register
+ * check to see if the platform supports MPAM extension and restores MPAM3
+ * register value if it is FEAT_STATE_ENABLED/FEAT_STATE_CHECKED.
+ *
+ * This is particularly more complicated because we can't check
+ * if the platform supports MPAM  by looking for status of a particular bit
+ * in the MDCR_EL3 or CPTR_EL3 register like other extensions.
+ * ------------------------------------------------------------------------
+ */
+
+	.macro	restore_mpam3_el3
+#if ENABLE_FEAT_MPAM
+#if ENABLE_FEAT_MPAM == 2
+
+	mrs x8, id_aa64pfr0_el1
+	lsr x8, x8, #(ID_AA64PFR0_MPAM_SHIFT)
+	and x8, x8, #(ID_AA64PFR0_MPAM_MASK)
+	mrs x7, id_aa64pfr1_el1
+	lsr x7, x7, #(ID_AA64PFR1_MPAM_FRAC_SHIFT)
+	and x7, x7, #(ID_AA64PFR1_MPAM_FRAC_MASK)
+	orr x7, x7, x8
+	cbz x7, no_mpam
+#endif
+	/* -----------------------------------------------------------
+	 * Restore MPAM3_EL3 register as per context state
+	 * Currently we only enable MPAM for NS world and trap to EL3
+	 * for MPAM access in lower ELs of Secure and Realm world
+	 * -----------------------------------------------------------
+	 */
+	ldr	x17, [sp, #CTX_EL3STATE_OFFSET + CTX_MPAM3_EL3]
+	msr	S3_6_C10_C5_0, x17 /* mpam3_el3 */
+
+no_mpam:
+#endif
+	.endm /* restore_mpam3_el3 */
+
 /* ------------------------------------------------------------------
  * The following macro is used to save and restore all the general
  * purpose and ARMv8.3-PAuth (if enabled) registers.
@@ -568,6 +419,8 @@ endfunc fpregs_context_restore
 	stp	x28, x29, [sp, #CTX_GPREGS_OFFSET + CTX_GPREG_X28]
 	mrs	x18, sp_el0
 	str	x18, [sp, #CTX_GPREGS_OFFSET + CTX_GPREG_SP_EL0]
+
+	/* PMUv3 is presumed to be always present */
 	mrs	x9, pmcr_el0
 	str	x9, [sp, #CTX_EL3STATE_OFFSET + CTX_PMCR_EL0]
 	/* Disable cycle counter when event counting is prohibited */
@@ -651,6 +504,8 @@ func restore_gp_pmcr_pauth_regs
 	msr	APGAKeyLo_EL1, x8
 	msr	APGAKeyHi_EL1, x9
 #endif /* CTX_INCLUDE_PAUTH_REGS */
+
+	/* PMUv3 is presumed to be always present */
 	ldr	x0, [sp, #CTX_EL3STATE_OFFSET + CTX_PMCR_EL0]
 	msr	pmcr_el0, x0
 	ldp	x0, x1, [sp, #CTX_GPREGS_OFFSET + CTX_GPREG_X0]
@@ -715,6 +570,25 @@ func save_and_update_ptw_el1_sys_regs
 	ret
 endfunc save_and_update_ptw_el1_sys_regs
 
+/* -----------------------------------------------------------------
+* The below macro returns the address of the per_world context for
+* the security state, retrieved through "get_security_state" macro.
+* The per_world context address is returned in the register argument.
+* Clobbers: x9, x10
+* ------------------------------------------------------------------
+*/
+
+.macro get_per_world_context _reg:req
+	ldr 	x10, [sp, #CTX_EL3STATE_OFFSET + CTX_SCR_EL3]
+	get_security_state x9, x10
+	mov_imm	x10, (CTX_GLOBAL_EL3STATE_END - CTX_CPTR_EL3)
+	mul	x9, x9, x10
+	adrp	x10, per_world_context
+	add	x10, x10, :lo12:per_world_context
+	add	x9, x9, x10
+	mov 	\_reg, x9
+.endm
+
 /* ------------------------------------------------------------------
  * This routine assumes that the SP_EL3 is pointing to a valid
  * context structure from where the gp regs and other special
@@ -739,22 +613,29 @@ func el3_exit
 	msr	spsel, #MODE_SP_ELX
 	str	x17, [sp, #CTX_EL3STATE_OFFSET + CTX_RUNTIME_SP]
 
-#if IMAGE_BL31
 	/* ----------------------------------------------------------
 	 * Restore CPTR_EL3.
 	 * ZCR is only restored if SVE is supported and enabled.
 	 * Synchronization is required before zcr_el3 is addressed.
 	 * ----------------------------------------------------------
 	 */
-	ldp	x19, x20, [sp, #CTX_EL3STATE_OFFSET + CTX_CPTR_EL3]
+
+	/* The address of the per_world context is stored in x9 */
+	get_per_world_context x9
+
+	ldp	x19, x20, [x9, #CTX_CPTR_EL3]
 	msr	cptr_el3, x19
 
+#if IMAGE_BL31
 	ands	x19, x19, #CPTR_EZ_BIT
 	beq	sve_not_enabled
 
 	isb
 	msr	S3_6_C1_C2_0, x20 /* zcr_el3 */
 sve_not_enabled:
+
+	restore_mpam3_el3
+
 #endif /* IMAGE_BL31 */
 
 #if IMAGE_BL31 && DYNAMIC_WORKAROUND_CVE_2018_3639
@@ -768,23 +649,9 @@ sve_not_enabled:
 1:
 #endif /* IMAGE_BL31 && DYNAMIC_WORKAROUND_CVE_2018_3639 */
 
-/*
- * This is a hot path, so we don't want to do some actual FEAT_RAS runtime
- * detection here. The "esb" is a cheaper variant, so using "dsb" in the
- * ENABLE_FEAT_RAS==2 case is not ideal, but won't hurt.
- */
-#if IMAGE_BL31 && ENABLE_FEAT_RAS == 1
-	/* ----------------------------------------------------------
-	 * Issue Error Synchronization Barrier to synchronize SErrors
-	 * before exiting EL3. We're running with EAs unmasked, so
-	 * any synchronized errors would be taken immediately;
-	 * therefore no need to inspect DISR_EL1 register.
- 	 * ----------------------------------------------------------
-	 */
-	esb
-#else
-	dsb	sy
-#endif /* IMAGE_BL31 && ENABLE_FEAT_RAS */
+#if IMAGE_BL31
+	synchronize_errors
+#endif /* IMAGE_BL31 */
 
 	/* ----------------------------------------------------------
 	 * Restore SPSR_EL3, ELR_EL3 and SCR_EL3 prior to ERET
@@ -808,7 +675,8 @@ sve_not_enabled:
 	ldr	x30, [sp, #CTX_GPREGS_OFFSET + CTX_GPREG_LR]
 
 #ifdef IMAGE_BL31
-	str	xzr, [sp, #CTX_EL3STATE_OFFSET + CTX_IS_IN_EL3]
+	/* Clear the EL3 flag as we are exiting el3 */
+	str	xzr, [sp, #CTX_EL3STATE_OFFSET + CTX_NESTED_EA_FLAG]
 #endif /* IMAGE_BL31 */
 
 	exception_return

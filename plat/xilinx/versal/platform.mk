@@ -45,12 +45,25 @@ endif
 VERSAL_PLATFORM ?= silicon
 $(eval $(call add_define_val,VERSAL_PLATFORM,VERSAL_PLATFORM_ID_${VERSAL_PLATFORM}))
 
+ifdef XILINX_OF_BOARD_DTB_ADDR
+$(eval $(call add_define,XILINX_OF_BOARD_DTB_ADDR))
+endif
+
+PLAT_XLAT_TABLES_DYNAMIC := 0
+ifeq (${PLAT_XLAT_TABLES_DYNAMIC},1)
+$(eval $(call add_define,PLAT_XLAT_TABLES_DYNAMIC))
+endif
+
+# enable assert() for release/debug builds
+ENABLE_ASSERTIONS := 1
+
 PLAT_INCLUDES		:=	-Iinclude/plat/arm/common/			\
 				-Iplat/xilinx/common/include/			\
 				-Iplat/xilinx/common/ipi_mailbox_service/	\
 				-Iplat/xilinx/versal/include/			\
 				-Iplat/xilinx/versal/pm_service/
 
+include lib/libfdt/libfdt.mk
 # Include GICv3 driver files
 include drivers/arm/gic/v3/gicv3.mk
 include lib/xlat_tables_v2/xlat_tables.mk
@@ -78,13 +91,17 @@ $(eval $(call add_define_val,VERSAL_CONSOLE,VERSAL_CONSOLE_ID_${VERSAL_CONSOLE})
 
 BL31_SOURCES		+=	drivers/arm/cci/cci.c				\
 				lib/cpus/aarch64/cortex_a72.S			\
+				common/fdt_wrappers.c                           \
 				plat/common/plat_psci_common.c			\
 				plat/xilinx/common/ipi.c			\
+				plat/xilinx/common/plat_fdt.c			\
+				plat/xilinx/common/plat_console.c               \
 				plat/xilinx/common/plat_startup.c		\
 				plat/xilinx/common/ipi_mailbox_service/ipi_mailbox_svc.c \
 				plat/xilinx/common/pm_service/pm_ipi.c		\
 				plat/xilinx/common/pm_service/pm_api_sys.c	\
 				plat/xilinx/common/pm_service/pm_svc_main.c	\
+				plat/xilinx/common/versal.c			\
 				plat/xilinx/versal/bl31_versal_setup.c		\
 				plat/xilinx/versal/plat_psci.c			\
 				plat/xilinx/versal/plat_versal.c		\
@@ -92,8 +109,16 @@ BL31_SOURCES		+=	drivers/arm/cci/cci.c				\
 				plat/xilinx/versal/sip_svc_setup.c		\
 				plat/xilinx/versal/versal_gicv3.c		\
 				plat/xilinx/versal/versal_ipi.c			\
-				plat/xilinx/versal/pm_service/pm_client.c
+				plat/xilinx/versal/pm_service/pm_client.c	\
+				common/fdt_fixup.c				\
+				${LIBFDT_SRCS}
 
 ifeq ($(HARDEN_SLS_ALL), 1)
 TF_CFLAGS_aarch64      +=      -mharden-sls=all
+endif
+
+ifeq (${ERRATA_ABI_SUPPORT}, 1)
+# enable the cpu macros for errata abi interface
+CORTEX_A72_H_INC	:= 1
+$(eval $(call add_define, CORTEX_A72_H_INC))
 endif
