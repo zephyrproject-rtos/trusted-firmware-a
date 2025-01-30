@@ -3,3 +3,7 @@ name: trusted-firmware-a
 build:
   cmake-ext: True
   kconfig-ext: True
+security:
+  external-references:
+    - cpe:2.3:o:arm:trusted_firmware-a:2.10.4:*:*:*:lts:*:*:*
+    - pkg:github/ARM-software/arm-trusted-firmware@lts-v2.10.4
