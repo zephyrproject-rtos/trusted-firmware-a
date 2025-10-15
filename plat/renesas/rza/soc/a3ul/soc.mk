@@ -42,7 +42,7 @@ $(RZ_ELF): $(BL2_ELF)
 
 $(RZ_BIN): $(BL2_BIN)
 	@echo "  IMG     $@"
-	$(Q)/usr/bin/perl ./plat/renesas/rza/soc/a3ul/rz_image.pl "$<" "$@"
+	$(Q)/usr/bin/perl ./tools/renesas/rza/a3ul/rz_image.pl "$<" "$@"
 
 $(BL2_MAP): $(BL2_ELF)
 $(RZ_MAP): $(BL2_MAP)

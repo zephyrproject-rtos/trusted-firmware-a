@@ -3,10 +3,11 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 #
-RZ_XSPI_DRIVER_PATH		:=	plat/renesas/rza/common/drivers/xspi
+
+RZ_XSPI_DRIVER_PATH		:=	drivers/renesas/rza/xspi
 
 RZ_XSPI_CONFIGS			:=	XSPI0 XSPI1 XSPI2
-RZ_XSPI_SOURCES			:=	plat/renesas/rza/soc/a3ul/drivers/xspi.c
+RZ_XSPI_SOURCES			:=	drivers/renesas/rza/xspi/xspi.c
 RZ_XSPI_HEADERS			:=
 RZ_XSPI0_IF			:=	spim
 RZ_XSPI0_IF_CONFIG		:=	.channel=0, .base=0x10060000
@@ -26,6 +27,10 @@ ifneq ($(strip $(XSPI0_DEVICE)),)
     $(error XSPI0_DEVICE and XSPI2_DEVICE can not be specified at the same time.)
   endif
 endif
+
+PLAT_INCLUDES			+=	-Iinclude/drivers/renesas/rza/spim	\
+					-Iinclude/drivers/renesas/rza/octal	\
+					-Iinclude/drivers/renesas/rza/xspi
 
 include plat/renesas/rza/common/rz_xspi_common.mk
 

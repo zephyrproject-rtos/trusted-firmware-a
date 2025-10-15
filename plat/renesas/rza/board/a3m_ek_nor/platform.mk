@@ -22,11 +22,11 @@ $(eval $(call add_define,RZ_FLASH_SIZE))
 ifneq (${USE_SDRAM},0)
 ifeq (${DDR_PLL4},1333)
 DDR_SOURCES		+=	plat/renesas/rza/soc/a3m/drivers/ddr/param_mc_C-011_D3-02-1.c	\
-				plat/renesas/rza/common/drivers/ddr/param_swizzle_T1.c
+				drivers/renesas/rza/ddr/param_swizzle_T1.c
 else
 DDR_PLL4		:= 	1600
 DDR_SOURCES		+=	plat/renesas/rza/soc/a3m/drivers/ddr/param_mc_C-011_D3-01-1.c	\
-				plat/renesas/rza/common/drivers/ddr/param_swizzle_T1.c
+				drivers/renesas/rza/ddr/param_swizzle_T1.c
 endif
 $(eval $(call add_define,DDR_PLL4))
 endif

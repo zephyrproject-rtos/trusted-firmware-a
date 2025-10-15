@@ -21,6 +21,7 @@
 static uintptr_t rz_otp_handler_devid(void *handle, u_register_t x1)
 {
 	uint32_t devid = mmio_read_32(RZ_OTP_BASE_DEVID);
+
 	SMC_RET1(handle, devid);
 }
 
@@ -31,6 +32,7 @@ static uintptr_t rz_otp_handler_chipid(void *handle, u_register_t x1,
 
 #if (PROTECTED_CHIPID == 1)
 	uint32_t ns = is_caller_non_secure(flags);
+
 	if (ns) {
 		WARN("%s: Unauthorized service call from non-secure\n",
 		     __func__);

@@ -5,7 +5,6 @@
  */
 
 #include <assert.h>
-#include <string.h>
 
 #include <plat/common/common_def.h>
 #include <plat_tzc_def.h>
@@ -15,21 +14,30 @@
 #include <arch_helpers.h>
 #include <common/bl_common.h>
 #include <common/desc_image_load.h>
-#include <cpg.h>
-#include <ddr.h>
 #include <drivers/generic_delay_timer.h>
+#include <drivers/renesas/rza/console/scifa.h>
+#include <drivers/renesas/rza/cpg/cpg.h>
+#include <drivers/renesas/rza/ddr/ddr.h>
+#include <drivers/renesas/rza/pfc/pfc.h>
+#include <drivers/renesas/rza/syc/syc.h>
+#include <drivers/renesas/rza/sys/sys_regs.h>
+#include <drivers/renesas/rza/xspi/xspi_api.h>
 #include <lib/mmio.h>
-#include <lib/xlat_tables/xlat_tables_compat.h>
-#include <pfc.h>
+#include <lib/xlat_tables/xlat_tables_v2.h>
 #include <rz_private.h>
 #include <rza_ipl_version.h>
-#include <rza_mmu.h>
 #include <rza_printf.h>
-#include <scifa.h>
-#include <syc.h>
-#include <sys_regs.h>
 
 static console_t console;
+
+/* Table of regions to map using the MMU. */
+const mmap_region_t plat_mmap[] = {
+	MAP_REGION_FLAT(0x00000000, 0x00200000, MT_MEMORY | MT_RW | MT_SECURE),
+	MAP_REGION_FLAT(0x10000000, 0x10000000, MT_DEVICE | MT_RW | MT_SECURE),
+	MAP_REGION_FLAT(0x20000000, 0x10000000, MT_MEMORY | MT_RW | MT_SECURE),
+	MAP_REGION_FLAT(0x40000000, 0x40000000, MT_MEMORY | MT_RW | MT_SECURE),
+	{ 0 }
+};
 
 int bl2_plat_handle_pre_image_load(unsigned int image_id)
 {
@@ -86,8 +94,8 @@ void bl2_el3_early_platform_setup(u_register_t arg1, u_register_t arg2,
 	cpg_setup();
 
 	/* initialize console driver */
-	ret = console_rza_register(PLAT_SCIF0_BASE, PLAT_UART_INCK_HZ,
-				   PLAT_UART_BARDRATE, &console);
+	ret = console_scifa_register(PLAT_SCIF0_BASE, PLAT_UART_INCK_HZ,
+				     PLAT_UART_BARDRATE, &console);
 	if (!ret)
 		panic();
 
@@ -98,32 +106,20 @@ void bl2_el3_early_platform_setup(u_register_t arg1, u_register_t arg2,
 
 void bl2_el3_plat_arch_setup(void)
 {
-	rza_mmu_pgtbl_cfg_t g_mmu_pagetable_array[] = {
-		/* vaddress, paddress,   size,       attribute */
-		{ 0x00000000, 0x00000000, 0x00200000,
-		  RZA_MMU_ATTRIBUTE_NORMAL_CACHEABLE },
-		{ 0x00200000, 0x00200000, 0x0FE00000,
-		  RZA_MMU_ATTRIBUTE_ACCESS_FAULT },
-		{ 0x10000000, 0x10000000, 0x10000000,
-		  RZA_MMU_ATTRIBUTE_DEVICE },
-		{ 0x20000000, 0x20000000, 0x10000000,
-		  RZA_MMU_ATTRIBUTE_NORMAL_CACHEABLE },
-		{ 0x30000000, 0x30000000, 0x10000000,
-		  RZA_MMU_ATTRIBUTE_ACCESS_FAULT },
-		{ 0x40000000, 0x40000000, 0x40000000,
-		  RZA_MMU_ATTRIBUTE_NORMAL_CACHEABLE },
-		{ 0x80000000, 0x80000000, 0x40000000,
-		  RZA_MMU_ATTRIBUTE_ACCESS_FAULT },
-		{ 0xC0000000, 0xC0000000, 0x40000000,
-		  RZA_MMU_ATTRIBUTE_ACCESS_FAULT },
-		{ 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF,
-		  RZA_MMU_ATTRIBUTE_CONFIG_END }
+	const mmap_region_t bl_regions[] = {
+		MAP_REGION_FLAT(BL2_BASE, BL2_END - BL2_BASE,
+				MT_MEMORY | MT_RW | MT_SECURE),
+		MAP_REGION_FLAT(BL_CODE_BASE, BL_CODE_END - BL_CODE_BASE,
+				MT_CODE | MT_SECURE),
+		MAP_REGION_FLAT(BL_RO_DATA_BASE,
+				BL_RO_DATA_END - BL_RO_DATA_BASE,
+				MT_RO_DATA | MT_SECURE),
+		{ 0 },
 	};
 
-	if (0 != plat_mmu_init(g_mmu_pagetable_array)) {
-		panic();
-	}
-	plat_mmu_enable();
+	setup_page_tables(bl_regions, plat_mmap);
+
+	enable_mmu_el3(0);
 }
 
 void bl2_platform_setup(void)
@@ -136,7 +132,9 @@ void bl2_platform_setup(void)
 	ddr_setup();
 #endif /* DEBUG_FPGA */
 
-	rz_io_setup();
+	xspi_setup();
+
+	plat_rza_io_setup();
 
 	RZ_RUN_TESTS();
 

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include <ddr_internal.h>
+#include <drivers/renesas/rza/ddr/ddr_internal.h>
 
 void ddr_ctrl_reten_en_n(uint8_t val)
 {

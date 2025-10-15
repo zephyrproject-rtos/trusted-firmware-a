@@ -9,18 +9,11 @@
 
 #include <common/bl_common.h>
 
-/* plat_gic.c */
-void plat_gic_driver_init(void);
-void plat_gic_init(void);
-void plat_gic_cpuif_enable(void);
-void plat_gic_cpuif_disable(void);
-void plat_gic_pcpu_init(void);
-
 /* plat_security.c */
 void plat_tzc400_setup(uintptr_t tzc_base);
 
 /* plat_storage.c */
-void rz_io_setup(void);
+void plat_rza_io_setup(void);
 
 /* plat_image_load.c */
 #if (APPLOAD == RZ_NOFIP)

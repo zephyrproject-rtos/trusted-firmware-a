@@ -43,9 +43,9 @@ $(RZ_ELF): $(BL2_ELF)
 $(RZ_BIN): $(BL2_BIN)
 	@echo "  IMG     $@"
 ifeq ($(NAND),1)
-	$(Q)/usr/bin/perl ./plat/renesas/rza/soc/a3m/rz_image_nand.pl "$<" "$@"
+	$(Q)/usr/bin/perl ./tools/renesas/rza/a3m/rz_image_nand.pl "$<" "$@"
 else
-	$(Q)/usr/bin/perl ./plat/renesas/rza/soc/a3m/rz_image.pl "$<" "$@"
+	$(Q)/usr/bin/perl ./tools/renesas/rza/a3m/rz_image.pl "$<" "$@"
 endif
 
 $(BL2_MAP): $(BL2_ELF)

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#include <syc.h>
+#include <drivers/renesas/rza/syc/syc.h>
 
 unsigned int plat_get_syscnt_freq2(void)
 {

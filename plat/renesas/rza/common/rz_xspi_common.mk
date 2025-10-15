@@ -24,7 +24,7 @@ endef
 
 define RZ_XSPI_INCLUDE_MAKEFILE
   $(if $(filter-out __,_$(strip $($(1)_DEVICE))_),$(call RZ_XSPI_ADD_IFDRIVER,$(RZ_$(1)_IF)))
-  $(if $(filter-out __,_$(strip $($(1)_DEVICE))_),$(eval include plat/renesas/rza/common/drivers/xspidevice/$($(1)_DEVICE)/rz_xspidevice.mk))
+  $(if $(filter-out __,_$(strip $($(1)_DEVICE))_),$(eval include drivers/renesas/rza/xspidevice/$($(1)_DEVICE)/rz_xspidevice.mk))
   $(if $(filter-out __,_$(strip $($(1)_DEVICE))_),$(eval RZ_USE_XSPI:=1))
 endef
 
@@ -63,5 +63,5 @@ $(RZ_XSPI_ENV): $(RZ_BUILD_PLAT_TMP)
 	$(call RZ_ADD_ENV,BOARD)
 
 $(RZ_XSPI_DEF): $(RZ_XSPI_ENV)
-	$(Q)$(SHELL) plat/renesas/rza/common/rz_bl2_xspi_config.sh "$(RZ_XSPI_ENV)" "$(RZ_XSPI_DEF)"
+	$(Q)$(SHELL) tools/renesas/rza/rz_bl2_xspi_config.sh "$(RZ_XSPI_ENV)" "$(RZ_XSPI_DEF)"
 endif

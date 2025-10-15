@@ -6,12 +6,12 @@
 
 #include <common/debug.h>
 #include <drivers/arm/tzc400.h>
+#include <drivers/renesas/rza/sys/sys_regs.h>
 #include <lib/mmio.h>
 
 #include "plat_tzc_def.h"
 #include "platform_def.h"
 #include "rza_printf.h"
-#include "sys_regs.h"
 
 typedef struct arm_tzc_regions_info {
 	unsigned long long base;

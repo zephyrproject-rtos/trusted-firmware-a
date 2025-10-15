@@ -27,7 +27,7 @@
 
 #define PLATFORM_SYSTEM_COUNT		U(1)
 #define PLATFORM_CLUSTER_COUNT		U(1)
-#define PLATFORM_CORE_COUNT		U(2)
+#define PLATFORM_CORE_COUNT		U(1)
 
 #define PLAT_MAX_PWR_LVL		MPIDR_AFFLVL2
 #define PLAT_NUM_PWR_DOMAINS		(PLATFORM_CORE_COUNT + \
@@ -90,8 +90,8 @@
 #define MAX_MMAP_REGIONS		U(9)
 #endif
 
-#define PLAT_VIRT_ADDR_SPACE_SIZE	(1ULL << 32)
-#define PLAT_PHY_ADDR_SPACE_SIZE	(1ULL << 32)
+#define PLAT_VIRT_ADDR_SPACE_SIZE	(1ULL << 34)
+#define PLAT_PHY_ADDR_SPACE_SIZE	(1ULL << 34)
 
 /*******************************************************************************
  * Determining the use of FIP format
