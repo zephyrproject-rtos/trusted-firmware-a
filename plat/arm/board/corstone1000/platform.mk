@@ -1,5 +1,6 @@
 #
 # Copyright (c) 2021-2026 Arm Limited and Contributors. All rights reserved.
+# Copyright (c) 2026, BayLibre SAS
 #
 # SPDX-License-Identifier: BSD-3-Clause
 #
@@ -73,6 +74,7 @@ BL31_SOURCES	+=	drivers/cfi/v2m/v2m_flash.c				\
 			plat/arm/board/corstone1000/common/corstone1000_plat.c		\
 			plat/arm/board/corstone1000/common/corstone1000_pm.c		\
 			plat/arm/board/corstone1000/common/corstone1000_bl31_setup.c	\
+			plat/common/plat_hold_pen.c				\
 			${CORSTONE1000_CPU_LIBS}
 
 ifneq (${ENABLE_STACK_PROTECTOR},0)

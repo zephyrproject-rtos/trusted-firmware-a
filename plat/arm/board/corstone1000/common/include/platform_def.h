@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2021-2025, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2026, BayLibre SAS
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -267,15 +268,14 @@
 #define PLAT_ARM_TRUSTED_MAILBOX_BASE	ARM_TRUSTED_SRAM_BASE
 
 #if defined(CORSTONE1000_MULTICORE)
-/* The secondary core entrypoint address points to bl31_warm_entrypoint
- * and the address size is 8 bytes */
-#define CORSTONE1000_SECONDARY_CORE_ENTRYPOINT_ADDRESS_SIZE    UL(0x8)
-
-#define CORSTONE1000_SECONDARY_CORE_HOLD_BASE	(PLAT_ARM_TRUSTED_MAILBOX_BASE + \
-						CORSTONE1000_SECONDARY_CORE_ENTRYPOINT_ADDRESS_SIZE)
-#define CORSTONE1000_SECONDARY_CORE_STATE_WAIT	ULL(0)
-#define CORSTONE1000_SECONDARY_CORE_STATE_GO	ULL(1)
-#define CORSTONE1000_SECONDARY_CORE_HOLD_SHIFT	ULL(3)
+/*
+ * Secondary core hold entries live in the unused FW_CONFIG area of
+ * shared SRAM (corstone1000 does not use a device tree at TF-A level).
+ * The base is offset by one slot so it doesn't overlap the trusted
+ * mailbox at offset 0.
+ */
+#define CORSTONE1000_HOLD_BASE	(PLAT_ARM_TRUSTED_MAILBOX_BASE + \
+				 HOLD_SLOT_SIZE)
 #endif
 
 #define PLAT_ARM_NSTIMER_FRAME_ID	U(1)
