@@ -1,11 +1,13 @@
 /*
  * Copyright (c) 2021-2026 Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2026, BayLibre SAS
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
 #include <arch.h>
 #include <asm_macros.S>
+#include <plat/common/plat_hold_pen.S>
 #include <platform_def.h>
 
 	.globl	plat_secondary_cold_boot_setup
@@ -57,27 +59,9 @@ endfunc plat_arm_calc_core_pos
 func plat_secondary_cold_boot_setup
 #if defined(CORSTONE1000_MULTICORE)
 
-	/* Calculate the address of our hold entry */
 	bl	plat_my_core_pos
-	lsl	x0, x0, #CORSTONE1000_SECONDARY_CORE_HOLD_SHIFT
-	mov_imm	x2, CORSTONE1000_SECONDARY_CORE_HOLD_BASE
-
-	/* Set the wait state for the secondary core */
-	mov_imm	x3, CORSTONE1000_SECONDARY_CORE_STATE_WAIT
-	str	x3, [x2, x0]
-	dmb	ish
-
-	/* Poll until the primary core signals to go  */
-poll_mailbox:
-	ldr	x1, [x2, x0]
-	cmp	x1, #CORSTONE1000_SECONDARY_CORE_STATE_WAIT
-	beq	1f
-	mov_imm	x0, PLAT_ARM_TRUSTED_MAILBOX_BASE
-	ldr	x1, [x0]
-	br	x1
-1:
-	wfe
-	b	poll_mailbox
+	mov_imm	x1, CORSTONE1000_HOLD_BASE
+	plat_hold_pen_wait_and_jump x1, x0, x2
 #else
 cb_panic:
 	b	cb_panic
