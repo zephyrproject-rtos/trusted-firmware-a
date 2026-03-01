@@ -533,7 +533,7 @@ ifeq ($($(ARCH)-ld-id),arm-link)
 		$(LDPATHS) $(LIBWRAPPER) $(LDLIBS) $(BL_LIBS) $(OBJS)
 else ifeq ($($(ARCH)-ld-id),gnu-gcc)
 	$$(q)$($(ARCH)-ld) -o $$@ $$(TF_LDFLAGS) $$(LDFLAGS) $$(WRAPPER_FLAGS) $(BL_LDFLAGS) -Wl,-Map=$(MAPFILE) \
-		$(addprefix -Wl$(comma)--script$(comma),$(LINKER_SCRIPTS)) -Wl,--script,$(DEFAULT_LINKER_SCRIPT) \
+		$(addprefix -T ,$(LINKER_SCRIPTS)) -T$(DEFAULT_LINKER_SCRIPT) \
 		$(OBJS) $(LDPATHS) $(LIBWRAPPER) $(LDLIBS) $(BL_LIBS)
 else
 	$$(q)$($(ARCH)-ld) -o $$@ $$(TF_LDFLAGS) $$(LDFLAGS) $$(WRAPPER_FLAGS) $(BL_LDFLAGS) -Map=$(MAPFILE) \
