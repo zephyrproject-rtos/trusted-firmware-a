@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2025, Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2021-2026, Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -41,7 +41,7 @@ static void corstone1000_system_reset(void)
 	*watchdog_ctrl_reg = SECURE_WATCHDOG_MASK_ENABLE;
 }
 
-#if defined(CORSTONE1000_FVP_MULTICORE)
+#if defined(CORSTONE1000_MULTICORE)
 int corstone1000_validate_ns_entrypoint(uintptr_t entrypoint)
 {
 	/*
@@ -77,7 +77,7 @@ void corstone1000_pwr_domain_on_finish(const psci_power_state_t *target_state)
 #endif
 
 plat_psci_ops_t plat_arm_psci_pm_ops = {
-#if defined(CORSTONE1000_FVP_MULTICORE)
+#if defined(CORSTONE1000_MULTICORE)
 	.pwr_domain_on = corstone1000_pwr_domain_on,
 	.pwr_domain_on_finish = corstone1000_pwr_domain_on_finish,
 	.validate_ns_entrypoint = corstone1000_validate_ns_entrypoint,

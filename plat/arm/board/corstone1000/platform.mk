@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2021-2025 Arm Limited and Contributors. All rights reserved.
+# Copyright (c) 2021-2026 Arm Limited and Contributors. All rights reserved.
 #
 # SPDX-License-Identifier: BSD-3-Clause
 #
@@ -44,10 +44,8 @@ $(eval $(call add_define,CORSTONE1000_WITH_BL32))
 endif
 
 ENABLE_MULTICORE       :=      0
-ifneq ($(filter ${TARGET_PLATFORM}, fvp),)
 ifeq (${ENABLE_MULTICORE},1)
-$(eval $(call add_define,CORSTONE1000_FVP_MULTICORE))
-endif
+$(eval $(call add_define,CORSTONE1000_MULTICORE))
 endif
 
 ifeq ($(CORSTONE1000_CORTEX_A320), 1)

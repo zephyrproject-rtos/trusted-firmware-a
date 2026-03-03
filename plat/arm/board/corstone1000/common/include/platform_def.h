@@ -266,7 +266,7 @@
 
 #define PLAT_ARM_TRUSTED_MAILBOX_BASE	ARM_TRUSTED_SRAM_BASE
 
-#if defined(CORSTONE1000_FVP_MULTICORE)
+#if defined(CORSTONE1000_MULTICORE)
 /* The secondary core entrypoint address points to bl31_warm_entrypoint
  * and the address size is 8 bytes */
 #define CORSTONE1000_SECONDARY_CORE_ENTRYPOINT_ADDRESS_SIZE    UL(0x8)
