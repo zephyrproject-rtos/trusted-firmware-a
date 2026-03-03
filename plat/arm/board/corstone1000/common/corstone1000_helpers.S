@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2025 Arm Limited and Contributors. All rights reserved.
+ * Copyright (c) 2021-2026 Arm Limited and Contributors. All rights reserved.
  *
  * SPDX-License-Identifier: BSD-3-Clause
  */
@@ -55,7 +55,7 @@ endfunc plat_arm_calc_core_pos
 	 * --------------------------------------------------------------------
 	 */
 func plat_secondary_cold_boot_setup
-#if defined(CORSTONE1000_FVP_MULTICORE)
+#if defined(CORSTONE1000_MULTICORE)
 
 	/* Calculate the address of our hold entry */
 	bl	plat_my_core_pos
